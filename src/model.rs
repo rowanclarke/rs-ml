@@ -45,14 +45,17 @@ impl Model {
         for e in 0..epochs {
             for x in 0..inputs.len() {
                 let output = self.series.forward(inputs[x].clone());
-                if (e % 100) == 0 {
+                if (e % 500) == 0 {
                     let mut cost = 0.0;
                     for i in 0..self.series.after() {
                         cost += (output[i] - targets[x][i]).powf(2.0);
                     }
-                    println!("Epoch: {}, Input: {}, Cost: {}", e, x, cost);
+                    println!(
+                        "Epoch: {}, Input: {:?}, Output: {:?}, Cost: {}",
+                        e, inputs[x], output, cost
+                    );
                 }
-                self.series.backward(output);
+                self.series.backward(targets[x].clone(), lr);
             }
         }
     }

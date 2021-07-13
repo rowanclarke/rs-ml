@@ -8,7 +8,7 @@ pub trait Layer: Any {
     fn before(&self) -> usize;
     fn after(&self) -> usize;
     fn forward(&mut self, input: Vec<f32>) -> Vec<f32>;
-    fn backward(&mut self, target: Vec<f32>) -> Vec<f32>;
+    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32>;
 }
 
 pub trait Group: Layer {
@@ -42,10 +42,10 @@ impl Layer for Object {
         }
     }
 
-    fn backward(&mut self, target: Vec<f32>) -> Vec<f32> {
+    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
         match self {
-            Self::Layer(layer) => layer.backward(target),
-            Self::Group(group) => group.backward(target),
+            Self::Layer(layer) => layer.backward(target, lr),
+            Self::Group(group) => group.backward(target, lr),
         }
     }
 }

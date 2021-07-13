@@ -40,10 +40,10 @@ impl Layer for Parallel {
         buffer
     }
 
-    fn backward(&mut self, target: Vec<f32>) -> Vec<f32> {
+    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
         let mut buffer = vec![0.0; self.before];
         for i in self.list.len()..0 {
-            let result = self.list[i - 1].backward(target[0..2].to_vec());
+            let result = self.list[i - 1].backward(target[0..2].to_vec(), lr);
             for j in self.list.len()..0 {
                 buffer[j] += result[j];
             }

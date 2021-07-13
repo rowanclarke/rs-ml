@@ -47,21 +47,23 @@ impl<A: Activation> Layer for Feed<A> {
         self.input = input;
         self.sum = vec![0.0; self.after];
         for i in 0..self.after {
+            self.sum[i] += self.bias[i];
             for j in 0..self.before {
-                self.sum[i] += self.bias[i] + self.weights[[j, i]] * self.input[j];
+                self.sum[i] += self.weights[[j, i]] * self.input[j];
             }
         }
         self.output = A::activate(self.sum.clone());
         self.output.clone()
     }
 
-    fn backward(&mut self, target: Vec<f32>) -> Vec<f32> {
+    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
         let mut result = self.input.clone();
         let del = A::deactivate(self.sum.clone());
-        for j in 0..self.before {
-            for i in 0..self.after {
-                let buffer = 0.5 * 2.0 * (self.output[i] - target[i]) * del[i];
-                result[j] -= buffer * self.weights[[j, i]] * self.input[j];
+        for i in 0..self.after {
+            let buffer = lr * 2.0 * (self.output[i] - target[i]) * del[i];
+            self.bias[i] -= buffer;
+            for j in 0..self.before {
+                result[j] -= buffer * self.weights[[j, i]];
                 self.weights[[j, i]] -= buffer * self.input[j];
             }
         }

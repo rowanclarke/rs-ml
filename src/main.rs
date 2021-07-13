@@ -19,5 +19,5 @@ fn main() {
     ];
     let targets = &[vec![0.0], vec![1.0], vec![1.0], vec![0.0]];
 
-    model.train(inputs, targets, 10000, 0.5);
+    model.train(inputs, targets, 10001, 0.1);
 }

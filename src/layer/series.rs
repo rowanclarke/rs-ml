@@ -38,10 +38,10 @@ impl Layer for Series {
         buffer
     }
 
-    fn backward(&mut self, target: Vec<f32>) -> Vec<f32> {
+    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
         let mut buffer = target;
-        for i in self.list.len()..0 {
-            buffer = self.list[i - 1].backward(buffer);
+        for i in (0..self.list.len()).rev() {
+            buffer = self.list[i].backward(buffer, lr);
         }
         buffer
     }
