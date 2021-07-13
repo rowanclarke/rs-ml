@@ -1,4 +1,4 @@
-use super::layer::{parallel::Parallel, series::Series, Dynamic, Fixed, Group, Layer, Object};
+use super::layer::{series::Series, Dynamic, Fixed, Group, Layer, Object};
 
 pub struct Model {
     stack: Vec<Box<dyn Group>>,

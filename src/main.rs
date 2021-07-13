@@ -3,7 +3,7 @@ mod layer;
 mod model;
 
 use activation::sigmoid::Sigmoid;
-use layer::{feed::Feed, parallel::Parallel, Layer};
+use layer::{feed::Feed, parallel::Parallel};
 use model::Model;
 
 fn main() {
