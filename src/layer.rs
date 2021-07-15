@@ -1,12 +1,12 @@
 pub mod feed;
-pub mod parallel;
+//pub mod parallel;
 pub mod series;
 
 use std::any::*;
 
 pub trait Layer: Any {
-    fn before(&self) -> usize;
-    fn after(&self) -> usize;
+    fn before(&self) -> Vec<usize>;
+    fn after(&self) -> Vec<usize>;
     fn forward(&mut self, input: Vec<f32>) -> Vec<f32>;
     fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32>;
 }
@@ -21,14 +21,14 @@ pub enum Object {
 }
 
 impl Layer for Object {
-    fn before(&self) -> usize {
+    fn before(&self) -> Vec<usize> {
         match self {
             Self::Layer(layer) => layer.before(),
             Self::Group(group) => group.before(),
         }
     }
 
-    fn after(&self) -> usize {
+    fn after(&self) -> Vec<usize> {
         match self {
             Self::Layer(layer) => layer.after(),
             Self::Group(group) => group.after(),
@@ -51,9 +51,9 @@ impl Layer for Object {
 }
 
 pub trait Dynamic {
-    fn new(before: usize) -> Self;
+    fn new(before: Vec<usize>) -> Self;
 }
 
 pub trait Fixed {
-    fn new(before: usize, after: usize) -> Self;
+    fn new(before: Vec<usize>, after: Vec<usize>) -> Self;
 }

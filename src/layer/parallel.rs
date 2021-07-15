@@ -2,12 +2,12 @@ use super::{Dynamic, Group, Layer, Object};
 
 pub struct Parallel {
     list: Vec<Object>,
-    before: usize,
-    after: usize,
+    before: Vec<usize>,
+    after: Vec<usize>,
 }
 
 impl Dynamic for Parallel {
-    fn new(before: usize) -> Self {
+    fn new(before: Vec<usize>) -> Self {
         Self {
             list: Vec::new(),
             before: before,
@@ -24,11 +24,11 @@ impl Group for Parallel {
 }
 
 impl Layer for Parallel {
-    fn before(&self) -> usize {
+    fn before(&self) -> Vec<usize> {
         self.before
     }
 
-    fn after(&self) -> usize {
+    fn after(&self) -> Vec<usize> {
         self.after
     }
 

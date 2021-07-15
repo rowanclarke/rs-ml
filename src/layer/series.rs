@@ -2,11 +2,11 @@ use super::{Dynamic, Group, Layer, Object};
 
 pub struct Series {
     list: Vec<Object>,
-    size: usize,
+    size: Vec<usize>,
 }
 
 impl Dynamic for Series {
-    fn new(before: usize) -> Self {
+    fn new(before: Vec<usize>) -> Self {
         Self {
             list: Vec::new(),
             size: before,
@@ -22,12 +22,12 @@ impl Group for Series {
 }
 
 impl Layer for Series {
-    fn before(&self) -> usize {
-        self.size
+    fn before(&self) -> Vec<usize> {
+        self.size.clone()
     }
 
-    fn after(&self) -> usize {
-        self.size
+    fn after(&self) -> Vec<usize> {
+        self.size.clone()
     }
 
     fn forward(&mut self, input: Vec<f32>) -> Vec<f32> {

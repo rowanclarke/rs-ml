@@ -3,13 +3,13 @@ mod layer;
 mod model;
 
 use activation::sigmoid::Sigmoid;
-use layer::{feed::Feed, parallel::Parallel};
+use layer::feed::Feed;
 use model::Model;
 
 fn main() {
-    let mut model = Model::new(2);
-    model.push_layer::<Feed<Sigmoid>>(2);
-    model.push_layer::<Feed<Sigmoid>>(1);
+    let mut model = Model::new(vec![2]);
+    model.push_layer::<Feed<Sigmoid>>(vec![2]);
+    model.push_layer::<Feed<Sigmoid>>(vec![1]);
 
     let inputs = &[
         vec![0.0, 0.0],

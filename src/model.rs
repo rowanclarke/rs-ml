@@ -7,7 +7,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: Vec<usize>) -> Self {
         Self {
             stack: Vec::new(),
             series: Box::new(Series::new(size)),
@@ -35,7 +35,7 @@ impl Model {
         self.last().push(Object::Group(group));
     }
 
-    pub fn push_layer<L: Layer + Fixed>(&mut self, after: usize) {
+    pub fn push_layer<L: Layer + Fixed>(&mut self, after: Vec<usize>) {
         let last = self.last();
         let before = last.before();
         last.push(Object::Layer(Box::new(L::new(before, after))));
@@ -47,7 +47,7 @@ impl Model {
                 let output = self.series.forward(inputs[x].clone());
                 if (e % 500) == 0 {
                     let mut cost = 0.0;
-                    for i in 0..self.series.after() {
+                    for i in 0..self.series.after()[0] {
                         cost += (output[i] - targets[x][i]).powf(2.0);
                     }
                     println!(

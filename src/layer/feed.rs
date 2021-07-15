@@ -19,13 +19,13 @@ pub struct Feed<A: Activation> {
 }
 
 impl<A: Activation> Fixed for Feed<A> {
-    fn new(before: usize, after: usize) -> Self {
+    fn new(before: Vec<usize>, after: Vec<usize>) -> Self {
         let mut rng = rand::thread_rng();
         Self {
-            weights: Array2::<f32>::zeros((before, after)).map(|_| rng.gen::<f32>()),
-            bias: Array1::<f32>::zeros(after).map(|_| rng.gen::<f32>()),
-            before,
-            after,
+            weights: Array2::<f32>::zeros((before[0], after[0])).map(|_| rng.gen::<f32>()),
+            bias: Array1::<f32>::zeros(after[0]).map(|_| rng.gen::<f32>()),
+            before: before[0],
+            after: after[0],
             input: Vec::new(),
             sum: Vec::new(),
             output: Vec::new(),
@@ -35,12 +35,12 @@ impl<A: Activation> Fixed for Feed<A> {
 }
 
 impl<A: Activation> Layer for Feed<A> {
-    fn before(&self) -> usize {
-        self.before
+    fn before(&self) -> Vec<usize> {
+        vec![self.before]
     }
 
-    fn after(&self) -> usize {
-        self.after
+    fn after(&self) -> Vec<usize> {
+        vec![self.after]
     }
 
     fn forward(&mut self, input: Vec<f32>) -> Vec<f32> {
