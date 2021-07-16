@@ -16,6 +16,10 @@ pub trait Group: Layer {
     fn push(&mut self, layer: Object);
 }
 
+pub trait Template<L: Layer> {
+    fn into(self, before: Vec<usize>) -> L;
+}
+
 pub enum Object {
     Layer(Box<dyn Layer>),
     Group(Box<dyn Group>),

@@ -1,4 +1,4 @@
-use super::layer::{series::Series, Dynamic, Fixed, Group, Layer, Object};
+use super::layer::{series::Series, Dynamic, Fixed, Group, Layer, Object, Template};
 use std::mem;
 
 pub struct Model {
@@ -35,10 +35,10 @@ impl Model {
         self.last().push(Object::Group(group));
     }
 
-    pub fn push_layer<L: Layer + Fixed>(&mut self, after: Vec<usize>) {
+    pub fn push_layer<L: Layer, T: Template<L>>(&mut self, template: T) {
         let last = self.last();
         let before = last.before();
-        last.push(Object::Layer(Box::new(L::new(before, after))));
+        last.push(Object::Layer(Box::new(template.into(before))));
     }
 
     pub fn train(&mut self, inputs: &[Vec<f32>], targets: &[Vec<f32>], epochs: u32, lr: f32) {

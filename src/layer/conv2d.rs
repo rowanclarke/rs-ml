@@ -1,5 +1,5 @@
 use super::super::activation::Activation;
-use super::{Fixed, Layer};
+use super::{Fixed, Layer, Template};
 use ndarray::{Array1, Array2};
 use rand::prelude::*;
 use std::marker::PhantomData;
@@ -12,12 +12,21 @@ pub struct Conv2D {
     after: Vec<usize>,
 }
 
-impl Fixed for Conv2D {
-    fn new(before: Vec<usize>, filter: Vec<usize>) -> Self {
+pub struct TempConv2D {
+    pub filters: usize,
+    pub kernel_size: (usize, usize),
+}
+
+impl Template<Conv2D> for TempConv2D {
+    fn into(self, before: Vec<usize>) -> Conv2D {
         let mut rng = rand::thread_rng();
-        let after = vec![filter[0] - before[0] + 1, filter[1] - before[1] + 1];
-        Self {
-            filter: Array2::<f32>::zeros((filter[0], filter[1])).map(|_| rng.gen::<f32>()),
+        let after = vec![
+            before[0] - self.kernel_size.0 + 1,
+            before[1] - self.kernel_size.1 + 1,
+        ];
+        Conv2D {
+            filter: Array2::<f32>::zeros((self.kernel_size.0, self.kernel_size.1))
+                .map(|_| rng.gen::<f32>()),
             input: Array2::<f32>::zeros((before[0], before[1])).map(|_| rng.gen::<f32>()),
             output: Array2::<f32>::zeros((after[0], after[1])).map(|_| rng.gen::<f32>()),
             before,
@@ -56,7 +65,7 @@ impl Layer for Conv2D {
 }
 
 impl Conv2D {
-    fn convolution(input: &Array2<f32>, filter: &Array2<f32>, output: &mut Array2<f32>) {
+    pub fn convolution(input: &Array2<f32>, filter: &Array2<f32>, output: &mut Array2<f32>) {
         for i in 0..output.shape()[0] {
             for j in 0..output.shape()[1] {
                 let mut sum = 0.0;
@@ -70,16 +79,24 @@ impl Conv2D {
         }
     }
 
-    fn full_convolution_rot(input: &Array2<f32>, filter: &Array2<f32>, output: &mut Array2<f32>) {
+    pub fn full_convolution_rot(
+        input: &Array2<f32>,
+        filter: &Array2<f32>,
+        output: &mut Array2<f32>,
+    ) {
         for i in 0..output.shape()[0] {
             for j in 0..output.shape()[1] {
                 let mut sum = 0.0;
                 for x in 0..filter.shape()[0] {
                     for y in 0..filter.shape()[1] {
-                        let xi = i - x;
-                        let yj = j - y;
-                        if xi >= 0 && yj >= 0 && xi < input.shape()[0] && yj < input.shape()[1] {
-                            sum += input[[xi, yj]] * filter[[x, y]];
+                        let xi = i as i32 - x as i32;
+                        let yj = j as i32 - y as i32;
+                        if xi >= 0
+                            && yj >= 0
+                            && xi < input.shape()[0] as i32
+                            && yj < input.shape()[1] as i32
+                        {
+                            sum += input[[xi as usize, yj as usize]] * filter[[x, y]];
                         }
                     }
                 }
