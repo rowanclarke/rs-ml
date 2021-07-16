@@ -1,6 +1,3 @@
-extern crate ndarray;
-extern crate rand;
-
 use super::super::activation::Activation;
 use super::{Fixed, Layer};
 use ndarray::{Array1, Array2};

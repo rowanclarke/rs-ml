@@ -3,13 +3,13 @@ mod layer;
 mod model;
 
 use activation::sigmoid::Sigmoid;
-use layer::feed::Feed;
+use layer::{conv2d::Conv2D, feed::Feed, Layer};
 use model::Model;
 
 fn main() {
-    let mut model = Model::new(vec![2]);
-    model.push_layer::<Feed<Sigmoid>>(vec![2]);
-    model.push_layer::<Feed<Sigmoid>>(vec![1]);
+    let mut model = Model::new(vec![64, 64]);
+    model.push_layer::<Conv2D>(vec![5, 5]);
+    model.push_layer::<Conv2D>(vec![5, 5]);
 
     let inputs = &[
         vec![0.0, 0.0],

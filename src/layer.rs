@@ -1,6 +1,7 @@
+pub mod conv2d;
 pub mod feed;
-//pub mod parallel;
 pub mod series;
+//pub mod parallel;
 
 use std::any::*;
 
