@@ -116,7 +116,6 @@ impl Conv2DLayer {
                         filter[[i, j, k, l]] = sum;
                     }
                 }
-                output[[i, j]] = sum;
             }
         }
     }
@@ -153,11 +152,84 @@ impl Conv2DLayer {
     }
 }
 
+pub struct MaxPooling2D {
+    pool_size: (usize, usize),
+}
+
+impl MaxPooling2D {
+    pub fn new(pool_size: (usize, usize)) -> Self {
+        Self { pool_size }
+    }
+}
+
+impl Template<MaxPooling2DLayer> for MaxPooling2D {
+    fn into(self, before: Vec<usize>) -> MaxPooling2DLayer {
+        let after = vec![
+            before[0] / self.pool_size.0,
+            before[1] / self.pool_size.1,
+            before[2],
+        ];
+        MaxPooling2DLayer {
+            pool_size: self.pool_size,
+            input: Array3::<f32>::zeros((before[0], before[1], before[2])),
+            output: Array3::<f32>::zeros((before[0], before[1], before[2])),
+            before,
+            after,
+        }
+    }
+}
+
+pub struct MaxPooling2DLayer {
+    pool_size: (usize, usize),
+    input: Array3<f32>,
+    output: Array3<f32>,
+    before: Vec<usize>,
+    after: Vec<usize>,
+}
+
+impl Layer for MaxPooling2DLayer {
+    fn before(&self) -> Vec<usize> {
+        self.before.clone()
+    }
+
+    fn after(&self) -> Vec<usize> {
+        self.after.clone()
+    }
+
+    fn forward(&mut self, input: Vec<f32>) -> Vec<f32> {
+        for i in 0..self.after[0] {
+            for j in 0..self.after[1] {
+                for k in 0..self.after[2] {
+                    let mut max: f32 = 0.0;
+                    for x in 0..self.pool_size.0 {
+                        for y in 0..self.pool_size.1 {
+                            max = max.max(
+                                self.input[[self.pool_size.0 * i + x, self.pool_size.1 * j + y, k]],
+                            )
                         }
                     }
+                    self.output[[i, j, k]] = max;
                 }
-                output[[i, j]] = sum;
             }
         }
+        self.output.clone().into_raw_vec()
+    }
+
+    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
+        let target =
+            Array3::from_shape_vec((self.after[0], self.after[1], self.after[2]), target).unwrap();
+        for i in 0..self.before[0] {
+            for j in 0..self.before[1] {
+                for k in 0..self.before[2] {
+                    if self.input[[i, j, k]]
+                        == self.output[[i / self.pool_size.0, j / self.pool_size.1, k]]
+                    {
+                        self.input[[i, j, k]] =
+                            target[[i / self.pool_size.0, j / self.pool_size.1, k]];
+                    }
+                }
+            }
+        }
+        self.input.clone().into_raw_vec()
     }
 }
