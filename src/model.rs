@@ -1,4 +1,4 @@
-use super::layer::{series::Series, Dynamic, Fixed, Group, Layer, Object, Template};
+use super::layer::{series::Series, Dynamic, Group, Layer, Object, Template};
 use std::mem;
 
 pub struct Model {
@@ -38,6 +38,7 @@ impl Model {
     pub fn push_layer<L: Layer, T: Template<L>>(&mut self, template: T) {
         let last = self.last();
         let before = last.before();
+        println!("{:?}", before);
         last.push(Object::Layer(Box::new(template.into(before))));
     }
 

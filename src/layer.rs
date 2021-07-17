@@ -1,5 +1,6 @@
 pub mod conv2d;
 pub mod feed;
+pub mod reshape;
 pub mod series;
 //pub mod parallel;
 
@@ -14,10 +15,6 @@ pub trait Layer: Any {
 
 pub trait Group: Layer {
     fn push(&mut self, layer: Object);
-}
-
-pub trait Template<L: Layer> {
-    fn into(self, before: Vec<usize>) -> L;
 }
 
 pub enum Object {
@@ -55,10 +52,10 @@ impl Layer for Object {
     }
 }
 
-pub trait Dynamic {
-    fn new(before: Vec<usize>) -> Self;
+pub trait Template<L: Layer> {
+    fn into(self, before: Vec<usize>) -> L;
 }
 
-pub trait Fixed {
-    fn new(before: Vec<usize>, after: Vec<usize>) -> Self;
+pub trait Dynamic {
+    fn new(before: Vec<usize>) -> Self;
 }

@@ -1,10 +1,40 @@
 use super::super::activation::Activation;
-use super::{Fixed, Layer};
+use super::{Layer, Template};
 use ndarray::{Array1, Array2};
 use rand::prelude::*;
 use std::marker::PhantomData;
 
 pub struct Feed<A: Activation> {
+    after: usize,
+    phantom: PhantomData<A>,
+}
+
+impl<A: Activation> Feed<A> {
+    pub fn new(after: usize) -> Self {
+        Self {
+            after,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<A: Activation> Template<FeedLayer<A>> for Feed<A> {
+    fn into(self, before: Vec<usize>) -> FeedLayer<A> {
+        let mut rng = rand::thread_rng();
+        FeedLayer::<A> {
+            weights: Array2::<f32>::zeros((before[0], self.after)).map(|_| rng.gen::<f32>()),
+            bias: Array1::<f32>::zeros(self.after).map(|_| rng.gen::<f32>()),
+            before: before[0],
+            after: self.after,
+            input: Vec::new(),
+            sum: Vec::new(),
+            output: Vec::new(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+pub struct FeedLayer<A: Activation> {
     weights: Array2<f32>,
     bias: Array1<f32>,
     before: usize,
@@ -15,23 +45,7 @@ pub struct Feed<A: Activation> {
     phantom: PhantomData<A>,
 }
 
-impl<A: Activation> Fixed for Feed<A> {
-    fn new(before: Vec<usize>, after: Vec<usize>) -> Self {
-        let mut rng = rand::thread_rng();
-        Self {
-            weights: Array2::<f32>::zeros((before[0], after[0])).map(|_| rng.gen::<f32>()),
-            bias: Array1::<f32>::zeros(after[0]).map(|_| rng.gen::<f32>()),
-            before: before[0],
-            after: after[0],
-            input: Vec::new(),
-            sum: Vec::new(),
-            output: Vec::new(),
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<A: Activation> Layer for Feed<A> {
+impl<A: Activation> Layer for FeedLayer<A> {
     fn before(&self) -> Vec<usize> {
         vec![self.before]
     }
