@@ -2,7 +2,7 @@ mod activation;
 mod layer;
 mod model;
 
-use activation::sigmoid::Sigmoid;
+use activation::{sigmoid::Sigmoid, softmax::Softmax};
 use layer::{conv2d::Conv2D, conv2d::MaxPooling2D, feed::Feed, reshape::Flatten};
 use mnist::{Mnist, MnistBuilder};
 use model::Model;
@@ -33,5 +33,5 @@ fn main() {
     model.push_layer(Conv2D::new(64, (4, 4)));
     model.push_layer(MaxPooling2D::new((2, 2)));
     model.push_layer(Flatten::new());
-    model.push_layer(Feed::<Sigmoid>::new(10));
+    model.push_layer(Feed::<Softmax>::new(10));
 }
