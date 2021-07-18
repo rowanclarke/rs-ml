@@ -24,11 +24,11 @@ impl<A: Activation> Template<FeedLayer<A>> for Feed<A> {
         FeedLayer::<A> {
             weights: Array2::<f32>::zeros((before[0], self.after)).map(|_| rng.gen::<f32>()),
             bias: Array1::<f32>::zeros(self.after).map(|_| rng.gen::<f32>()),
-            before: before[0],
-            after: self.after,
             input: Vec::new(),
             sum: Vec::new(),
             output: Vec::new(),
+            before: before[0],
+            after: self.after,
             phantom: PhantomData,
         }
     }
@@ -37,11 +37,11 @@ impl<A: Activation> Template<FeedLayer<A>> for Feed<A> {
 pub struct FeedLayer<A: Activation> {
     weights: Array2<f32>,
     bias: Array1<f32>,
-    before: usize,
-    after: usize,
     input: Vec<f32>,
     sum: Vec<f32>,
     output: Vec<f32>,
+    before: usize,
+    after: usize,
     phantom: PhantomData<A>,
 }
 

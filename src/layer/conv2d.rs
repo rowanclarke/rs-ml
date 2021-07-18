@@ -4,21 +4,23 @@ use ndarray::{Array1, Array2, Array3, Array4};
 use rand::prelude::*;
 use std::marker::PhantomData;
 
-pub struct Conv2D {
+pub struct Conv2D<A: Activation> {
     filters: usize,
     kernel_size: (usize, usize),
+    phantom: PhantomData<A>,
 }
 
-impl Conv2D {
+impl<A: Activation> Conv2D<A> {
     pub fn new(filters: usize, kernel_size: (usize, usize)) -> Self {
         Self {
             filters,
             kernel_size,
+            phantom: PhantomData,
         }
     }
 }
 
-impl<A: Activation> Template<Conv2DLayer<A>> for Conv2D {
+impl<A: Activation> Template<Conv2DLayer<A>> for Conv2D<A> {
     fn into(self, before: Vec<usize>) -> Conv2DLayer<A> {
         let mut rng = rand::thread_rng();
         let after = vec![
@@ -34,11 +36,11 @@ impl<A: Activation> Template<Conv2DLayer<A>> for Conv2D {
                 self.filters,
             ))
             .map(|_| rng.gen::<f32>()),
-            before,
-            after,
             input: Array3::<f32>::zeros((before[0], before[1], before[2])),
             sum: Array3::<f32>::zeros((after[0], after[1], after[2])),
             output: Array3::<f32>::zeros((after[0], after[1], after[2])),
+            before,
+            after,
             phantom: PhantomData,
         }
     }
@@ -46,11 +48,11 @@ impl<A: Activation> Template<Conv2DLayer<A>> for Conv2D {
 
 pub struct Conv2DLayer<A: Activation> {
     filter: Array4<f32>,
-    before: Vec<usize>,
-    after: Vec<usize>,
     input: Array3<f32>,
     sum: Array3<f32>,
     output: Array3<f32>,
+    before: Vec<usize>,
+    after: Vec<usize>,
     phantom: PhantomData<A>,
 }
 
