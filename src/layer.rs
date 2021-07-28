@@ -1,16 +1,22 @@
-pub mod conv2d;
+//pub mod conv2d;
 pub mod feed;
-pub mod reshape;
+//pub mod reshape;
 pub mod series;
 //pub mod parallel;
 
+use super::loss::Loss;
+use ndarray::Array2;
 use std::any::*;
 
-pub trait Layer: Any {
+pub trait Cost {
+    fn cost(&self, given: Array2<f32>) -> Array2<f32>;
+}
+
+pub trait Layer: Cost + Any {
     fn before(&self) -> Vec<usize>;
     fn after(&self) -> Vec<usize>;
-    fn forward(&mut self, input: Vec<f32>) -> Vec<f32>;
-    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32>;
+    fn forward(&mut self, input: Array2<f32>) -> Array2<f32>;
+    fn backward(&mut self, next: CostObject, lr: f32);
 }
 
 pub trait Group: Layer {
@@ -20,6 +26,15 @@ pub trait Group: Layer {
 pub enum Object {
     Layer(Box<dyn Layer>),
     Group(Box<dyn Group>),
+}
+
+impl Cost for Object {
+    fn cost(&self, given: Array2<f32>) -> Array2<f32> {
+        match self {
+            Self::Layer(layer) => layer.cost(given),
+            Self::Group(group) => group.cost(given),
+        }
+    }
 }
 
 impl Layer for Object {
@@ -37,17 +52,33 @@ impl Layer for Object {
         }
     }
 
-    fn forward(&mut self, input: Vec<f32>) -> Vec<f32> {
+    fn forward(&mut self, input: Array2<f32>) -> Array2<f32> {
         match self {
             Self::Layer(layer) => layer.forward(input),
             Self::Group(group) => group.forward(input),
         }
     }
 
-    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
+    fn backward(&mut self, dele: CostObject, lr: f32) {
         match self {
-            Self::Layer(layer) => layer.backward(target, lr),
-            Self::Group(group) => group.backward(target, lr),
+            Self::Layer(layer) => layer.backward(dele, lr),
+            Self::Group(group) => group.backward(dele, lr),
+        }
+    }
+}
+
+pub enum CostObject {
+    Loss(Box<dyn Loss>),
+    Layer(Box<dyn Layer>),
+    Group(Box<dyn Group>),
+}
+
+impl Cost for CostObject {
+    fn cost(&self, given: Array2<f32>) -> Array2<f32> {
+        match self {
+            Self::Loss(loss) => loss.cost(given),
+            Self::Layer(layer) => layer.cost(given),
+            Self::Group(group) => group.cost(given),
         }
     }
 }

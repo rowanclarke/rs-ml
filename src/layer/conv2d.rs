@@ -1,4 +1,5 @@
 use super::super::activation::Activation;
+use super::super::loss::Loss;
 use super::{Layer, Template};
 use ndarray::{Array1, Array2, Array3, Array4};
 use rand::prelude::*;
@@ -78,23 +79,25 @@ impl<A: Activation> Layer for Conv2DLayer<A> {
         self.output.clone().into_raw_vec()
     }
 
-    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
+    fn backward(&mut self, dele: Vec<f32>, lr: f32) -> Vec<f32> {
+        let lin = self.after[0] * self.after[1] * self.after[2];
+        let dele = Array2::from_shape_vec((1, lin), dele).unwrap();
+        let dela =
+            Array2::from_shape_vec((lin, lin), A::deactivate(self.sum.clone().into_raw_vec()))
+                .unwrap();
         let mut delf = Array4::<f32>::zeros(self.filter.raw_dim());
-        let mut deli = Array3::<f32>::zeros(self.input.raw_dim());
-        let del = Array3::from_shape_vec(
-            (self.after[0], self.after[1], self.after[2]),
-            A::deactivate(self.sum.clone().into_raw_vec()),
-        )
-        .unwrap();
-        let target =
-            Array3::from_shape_vec((self.after[0], self.after[1], self.after[2]), target).unwrap();
-        let dele = (self.output.clone() - target) * del;
 
-        Self::back_convolution(&self.input, &dele, &mut delf);
-        Self::full_convolution_rot(&dele, &self.filter, &mut deli);
+        let del = dele
+            .dot(&dela)
+            .into_shape((self.after[0], self.after[1], self.after[2]))
+            .unwrap();
 
-        self.filter = self.filter.clone() - lr * delf;
-        (self.input.clone() - lr * deli).into_raw_vec()
+        Self::back_convolution(&self.input, &del, &mut delf);
+        Self::full_convolution_rot(&del, &self.filter, &mut self.input);
+
+        // TODO: Biases
+        self.filter = &self.filter - &(lr * delf);
+        (lr * &self.input).into_raw_vec()
     }
 }
 
@@ -142,7 +145,7 @@ impl<A: Activation> Conv2DLayer<A> {
     ) {
         for i in 0..output.shape()[0] {
             for j in 0..output.shape()[1] {
-                for k in 0..output.shape()[1] {
+                for k in 0..output.shape()[2] {
                     let mut sum = 0.0;
                     for x in 0..filter.shape()[0] {
                         for y in 0..filter.shape()[1] {
@@ -187,7 +190,7 @@ impl Template<MaxPooling2DLayer> for MaxPooling2D {
         MaxPooling2DLayer {
             pool_size: self.pool_size,
             input: Array3::<f32>::zeros((before[0], before[1], before[2])),
-            output: Array3::<f32>::zeros((before[0], before[1], before[2])),
+            output: Array3::<f32>::zeros((after[0], after[1], after[2])),
             before,
             after,
         }
@@ -233,9 +236,9 @@ impl Layer for MaxPooling2DLayer {
         self.output.clone().into_raw_vec()
     }
 
-    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
-        let target =
-            Array3::from_shape_vec((self.after[0], self.after[1], self.after[2]), target).unwrap();
+    fn backward(&mut self, dele: Vec<f32>, lr: f32) -> Vec<f32> {
+        let dele =
+            Array3::from_shape_vec((self.after[0], self.after[1], self.after[2]), dele).unwrap();
         for i in 0..self.before[0] {
             for j in 0..self.before[1] {
                 for k in 0..self.before[2] {
@@ -243,7 +246,7 @@ impl Layer for MaxPooling2DLayer {
                         == self.output[[i / self.pool_size.0, j / self.pool_size.1, k]]
                     {
                         self.input[[i, j, k]] =
-                            target[[i / self.pool_size.0, j / self.pool_size.1, k]];
+                            dele[[i / self.pool_size.0, j / self.pool_size.1, k]];
                     }
                 }
             }

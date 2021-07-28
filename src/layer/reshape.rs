@@ -1,3 +1,4 @@
+use super::super::loss::Loss;
 use super::{Layer, Template};
 use std::iter::Product;
 
@@ -30,7 +31,7 @@ impl Flatten {
 
 impl Template<ReshapeLayer> for Flatten {
     fn into(self, before: Vec<usize>) -> ReshapeLayer {
-        let mut after: usize = 0;
+        let mut after: usize = 1;
         for i in before.clone() {
             after *= i;
         }

@@ -1,4 +1,6 @@
-use super::{Dynamic, Group, Layer, Object};
+use super::super::loss::Loss;
+use super::{Cost, CostObject, Dynamic, Group, Layer, Object};
+use ndarray::Array2;
 
 pub struct Series {
     list: Vec<Object>,
@@ -21,6 +23,12 @@ impl Group for Series {
     }
 }
 
+impl Cost for Series {
+    fn cost(&self, given: Array2<f32>) -> Array2<f32> {
+        self.list[0].cost(given)
+    }
+}
+
 impl Layer for Series {
     fn before(&self) -> Vec<usize> {
         self.size.clone()
@@ -30,7 +38,7 @@ impl Layer for Series {
         self.size.clone()
     }
 
-    fn forward(&mut self, input: Vec<f32>) -> Vec<f32> {
+    fn forward(&mut self, input: Array2<f32>) -> Array2<f32> {
         let mut buffer = input;
         for i in 0..self.list.len() {
             buffer = self.list[i].forward(buffer);
@@ -38,11 +46,9 @@ impl Layer for Series {
         buffer
     }
 
-    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
-        let mut buffer = target;
-        for i in (0..self.list.len()).rev() {
-            buffer = self.list[i].backward(buffer, lr);
+    fn backward(&mut self, dele: CostObject, lr: f32) {
+        for i in 0..self.list.len() {
+            self.list[i].backward(buffer, lr);
         }
-        buffer
     }
 }

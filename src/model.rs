@@ -1,9 +1,13 @@
-use super::layer::{series::Series, Dynamic, Group, Layer, Object, Template};
+use super::layer::{series::Series, Cost, CostObject, Dynamic, Group, Layer, Object, Template};
+use super::loss::{mse::MeanSquaredError, Loss, LossBuilder};
+use ndarray::prelude::Array2;
 use std::mem;
 
 pub struct Model {
     stack: Vec<Box<dyn Group>>,
     series: Box<Series>,
+    loss: Box<dyn Loss>,
+    lr: f32,
 }
 
 impl Model {
@@ -11,6 +15,8 @@ impl Model {
         Self {
             stack: Vec::new(),
             series: Box::new(Series::new(size)),
+            loss: Box::new(MeanSquaredError::new()),
+            lr: 0.01,
         }
     }
 
@@ -38,25 +44,23 @@ impl Model {
     pub fn push_layer<L: Layer, T: Template<L>>(&mut self, template: T) {
         let last = self.last();
         let before = last.before();
-        println!("{:?}", before);
         last.push(Object::Layer(Box::new(template.into(before))));
     }
 
-    pub fn train(&mut self, inputs: &[Vec<f32>], targets: &[Vec<f32>], epochs: u32, lr: f32) {
+    pub fn compile<L: LossBuilder + Loss>(&mut self, lr: f32) {
+        self.loss = Box::new(L::new());
+        self.lr = lr;
+    }
+
+    pub fn train(&mut self, inputs: &[Array2<f32>], targets: &[Array2<f32>], epochs: u32) {
         for e in 0..epochs {
             for x in 0..inputs.len() {
                 let output = self.series.forward(inputs[x].clone());
-                if (e % 500) == 0 {
-                    let mut cost = 0.0;
-                    for i in 0..self.series.after()[0] {
-                        cost += (output[i] - targets[x][i]).powf(2.0);
-                    }
-                    println!(
-                        "Epoch: {}, Input: {:?}, Output: {:?}, Cost: {}",
-                        e, inputs[x], output, cost
-                    );
+                if e % 100 == 0 {
+                    let cost = self.loss.forward(output.clone(), targets[x].clone());
+                    println!("Epoch: {}, Cost: {}", e, cost);
                 }
-                self.series.backward(targets[x].clone(), lr);
+                self.series.backward(CostObject::Loss(self.loss), self.lr);
             }
         }
     }
