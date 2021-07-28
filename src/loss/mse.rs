@@ -1,27 +1,37 @@
+use super::super::matrix::{Column, Jacobean, Matrix};
 use super::{Cost, Loss, LossBuilder};
 use ndarray::Array2;
 
-pub struct MeanSquaredError {}
+pub struct MeanSquaredError {
+    output: Column,
+    target: Column,
+}
 
 impl Cost for MeanSquaredError {
-    fn cost(&self, given: Array2<f32>) -> Array2<f32> {
-        given
+    fn cost(&self, given: Jacobean) -> Jacobean {
+        let d = self.backward();
+        d.dot(&given)
     }
 }
 
 impl Loss for MeanSquaredError {
-    fn forward(&self, output: Array2<f32>, target: Array2<f32>) -> f32 {
-        let mut sum = 0.0;
-        for i in 0..output.len() {
-            sum += (output[[i, 0]] - target[[i, 0]]).powf(2.0);
-        }
-        sum / output.len() as f32
+    fn train(&mut self, output: Column, target: Column) {
+        self.output = output;
+        self.target = target;
     }
 
-    fn backward(&self, output: Array2<f32>, target: Array2<f32>) -> Array2<f32> {
-        let mut del = Array2::zeros((1, output.len()));
-        for i in 0..output.len() {
-            del[[i, 0]] = 2.0 / output.len() as f32 * (output[[i, 0]] - target[[i, 0]]);
+    fn forward(&self) -> f32 {
+        let mut sum = 0.0;
+        for i in 0..self.output.len() {
+            sum += (self.output[[i, 0]] - self.target[[i, 0]]).powf(2.0);
+        }
+        sum
+    }
+
+    fn backward(&self) -> Array2<f32> {
+        let mut del = Array2::zeros((1, self.output.len()));
+        for i in 0..self.output.len() {
+            del[[0, i]] = 2.0 * (self.output[[i, 0]] - self.target[[i, 0]]);
         }
         del
     }
@@ -29,6 +39,9 @@ impl Loss for MeanSquaredError {
 
 impl LossBuilder for MeanSquaredError {
     fn new() -> Self {
-        Self {}
+        Self {
+            output: Column::zeros((0, 0)),
+            target: Column::zeros((0, 0)),
+        }
     }
 }

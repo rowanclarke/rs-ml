@@ -1,7 +1,9 @@
-use super::super::activation::Activation;
-use super::super::loss::Loss;
-use super::{Cost, CostObject, Layer, Template};
-use ndarray::{Array1, Array2};
+use super::super::{
+    activation::Activation,
+    matrix::{Column, Jacobean, Matrix},
+};
+use super::{Cost, CostObject, Layer, LayerBuilder};
+use ndarray::Ix2;
 use rand::prelude::*;
 use std::marker::PhantomData;
 
@@ -19,59 +21,70 @@ impl<A: Activation> Feed<A> {
     }
 }
 
-impl<A: Activation> Template<FeedLayer<A>> for Feed<A> {
-    fn into(self, before: Vec<usize>) -> FeedLayer<A> {
+impl<A: Activation> LayerBuilder for Feed<A> {
+    fn build(&self, before: Vec<usize>, other: CostObject) -> Box<dyn Layer> {
         let mut rng = rand::thread_rng();
-        FeedLayer::<A> {
-            weights: Array2::<f32>::zeros((before[0], self.after)).map(|_| rng.gen::<f32>()),
-            bias: Array2::<f32>::zeros((1, self.after)).map(|_| rng.gen::<f32>()),
-            input: Array2::<f32>::zeros((1, before[0])),
-            sum: Array2::<f32>::zeros((1, self.after)),
-            output: Array2::<f32>::zeros((1, self.after)),
+        Box::new(FeedLayer::<A> {
+            weights: Matrix::zeros((self.after, before[0])).map(|_| rng.gen::<f32>()),
+            bias: Column::zeros((self.after, 1)).map(|_| rng.gen::<f32>()),
+            input: Column::zeros((before[0], 1)),
+            sum: Column::zeros((self.after, 1)),
+            output: Column::zeros((self.after, 1)),
             before: before[0],
             after: self.after,
+            other,
             phantom: PhantomData,
-        }
+        })
+    }
+
+    fn after(&self, before: Vec<usize>) -> Vec<usize> {
+        vec![self.after]
     }
 }
 
 pub struct FeedLayer<A: Activation> {
-    weights: Array2<f32>,
-    bias: Array2<f32>,
-    input: Array2<f32>,
-    sum: Array2<f32>,
-    output: Array2<f32>,
+    pub weights: Matrix,
+    pub bias: Column,
+    input: Column,
+    sum: Column,
+    output: Column,
     before: usize,
     after: usize,
+    other: CostObject,
     phantom: PhantomData<A>,
 }
 
 impl<A: Activation> FeedLayer<A> {
-    pub fn dels_x(&self) -> Array2<f32> {
-        self.weights
+    pub fn ds_x(&self) -> Jacobean {
+        self.weights.clone()
     }
 
-    pub fn dels_w(&self) -> Array2<f32> {
-        let del = Array2::zeros((self.after, self.after * self.before));
+    pub fn ds_w(&self) -> Jacobean {
+        let mut ds_w = Jacobean::zeros((self.after, self.after * self.before));
         for i in 0..self.after {
             for j in 0..self.before {
-                del[[i, i * self.before + j]] = self.input[[j, 0]];
+                ds_w[[i, i * self.before + j]] = self.input[[j, 0]];
             }
         }
-        del
+        ds_w
     }
 
-    pub fn dels_b(&self) -> Array2<f32> {
-        let del = Array2::zeros((self.after, self.after));
+    pub fn ds_b(&self) -> Jacobean {
+        let mut ds_b = Jacobean::zeros((self.after, self.after));
         for i in 0..self.after {
-            del[[i, i]] = 1.0;
+            ds_b[[i, i]] = 1.0;
         }
-        del
+        ds_b
     }
 }
 
 impl<A: Activation> Cost for FeedLayer<A> {
-    fn cost(&self, given: Array2<f32>) -> Array2<f32> {}
+    fn cost(&self, given: Jacobean) -> Jacobean {
+        let da_s = A::deactivate(self.sum.clone());
+        let ds_x = self.ds_x();
+        let da_wb = da_s.dot(&ds_x.dot(&given));
+        self.other.cost(da_wb)
+    }
 }
 
 impl<A: Activation> Layer for FeedLayer<A> {
@@ -83,24 +96,48 @@ impl<A: Activation> Layer for FeedLayer<A> {
         vec![self.after]
     }
 
-    fn forward(&mut self, input: Array2<f32>) -> Array2<f32> {
-        self.input = input;
-        self.sum = self.weights.dot(&self.input) + self.bias;
-        self.output = A::activate(self.sum.clone());
-        self.output.clone()
+    fn train(&mut self, input: Column, target: Column, lr: f32) {
+        self.forward(input);
+        match &mut self.other {
+            CostObject::Layer(layer) => layer.train(self.output.clone(), target, lr),
+            CostObject::Loss(loss) => loss.train(self.output.clone(), target),
+        };
+        self.backward(lr);
     }
 
-    fn backward(&mut self, dele: CostObject, lr: f32) {
-        let dela = A::deactivate(self.sum.clone());
-        let delw = dele
-            .cost(dela.dot(&self.dels_w()))
+    fn test(&mut self, input: Column) {
+        self.forward(input);
+        match &mut self.other {
+            CostObject::Layer(layer) => layer.test(self.output.clone()),
+            CostObject::Loss(_) => println!("{}", self.output),
+        };
+    }
+
+    fn forward(&mut self, input: Column) {
+        self.input = input;
+        self.sum = self.weights.dot(&self.input) + &self.bias;
+        self.output = A::activate(self.sum.clone());
+    }
+
+    fn backward(&mut self, lr: f32) {
+        let da_s = A::deactivate(self.sum.clone());
+        let da_w = da_s.dot(&self.ds_w());
+        let da_b = da_s.dot(&self.ds_b());
+        let dc_w = self
+            .other
+            .cost(da_w)
             .into_shape(self.weights.shape())
+            .unwrap()
+            .into_dimensionality::<Ix2>()
             .unwrap();
-        let delb = dele
-            .cost(dela.dot(&self.dels_b()))
+        let dc_b = self
+            .other
+            .cost(da_b)
             .into_shape(self.bias.shape())
+            .unwrap()
+            .into_dimensionality::<Ix2>()
             .unwrap();
-        self.weights = self.weights - lr * delw;
-        self.bias = self.bias - lr * delb;
+        self.weights = &self.weights - lr * dc_w;
+        self.bias = &self.bias - lr * dc_b;
     }
 }

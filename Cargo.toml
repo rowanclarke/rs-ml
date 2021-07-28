@@ -7,6 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ndarray = "0.13.0"
+ndarray = "0.15.3"
 rand = "0.8.4"
 mnist = "0.4.1"

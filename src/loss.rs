@@ -1,13 +1,13 @@
 pub mod mse;
-//pub mod xent;
 
 use super::layer::Cost;
-use ndarray::Array2;
+use super::matrix::{Column, Jacobean};
 use std::any::Any;
 
 pub trait Loss: Cost + Any {
-    fn forward(&self, output: Array2<f32>, target: Array2<f32>) -> f32;
-    fn backward(&self, output: Array2<f32>, target: Array2<f32>) -> Array2<f32>;
+    fn train(&mut self, output: Column, target: Column);
+    fn forward(&self) -> f32;
+    fn backward(&self) -> Jacobean;
 }
 
 pub trait LossBuilder {
