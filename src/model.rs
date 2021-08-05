@@ -1,6 +1,6 @@
 use super::layer::{Cost, CostObject, Layer, LayerBuilder};
 use super::loss::{Loss, LossBuilder};
-use super::matrix::{Column, Matrix};
+use super::matrix::{Column, Jacobean, Matrix};
 use std::mem;
 
 pub struct ModelBuilder {

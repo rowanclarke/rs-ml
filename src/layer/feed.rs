@@ -23,12 +23,13 @@ impl<A: Activation> Feed<A> {
 
 impl<A: Activation> LayerBuilder for Feed<A> {
     fn build(&self, before: Vec<usize>, other: CostObject) -> Box<dyn Layer> {
+        let mut rng = rand::thread_rng();
         Box::new(FeedLayer::<A> {
-            weights: Matrix::random((self.after, before[0])),
-            bias: Column::random(self.after),
-            input: Column::zeros(before[0]),
-            sum: Column::zeros(self.after),
-            output: Column::zeros(self.after),
+            weights: Matrix::zeros((self.after, before[0])).map(|_| rng.gen::<f32>()),
+            bias: Column::zeros((self.after, 1)).map(|_| rng.gen::<f32>()),
+            input: Column::zeros((before[0], 1)),
+            sum: Column::zeros((self.after, 1)),
+            output: Column::zeros((self.after, 1)),
             before: before[0],
             after: self.after,
             other,
@@ -62,7 +63,7 @@ impl<A: Activation> FeedLayer<A> {
         let mut ds_w = Jacobean::zeros((self.after, self.after * self.before));
         for i in 0..self.after {
             for j in 0..self.before {
-                ds_w[(i, i * self.before + j)] = self.input[j];
+                ds_w[[i, i * self.before + j]] = self.input[[j, 0]];
             }
         }
         ds_w
@@ -71,7 +72,7 @@ impl<A: Activation> FeedLayer<A> {
     pub fn ds_b(&self) -> Jacobean {
         let mut ds_b = Jacobean::zeros((self.after, self.after));
         for i in 0..self.after {
-            ds_b[(i, i)] = 1.0;
+            ds_b[[i, i]] = 1.0;
         }
         ds_b
     }
@@ -81,7 +82,7 @@ impl<A: Activation> Cost for FeedLayer<A> {
     fn cost(&self, given: Jacobean) -> Jacobean {
         let da_s = A::deactivate(self.sum.clone());
         let ds_x = self.ds_x();
-        let da_wb = &da_s * &(&ds_x * &given);
+        let da_wb = da_s.dot(&ds_x.dot(&given));
         self.other.cost(da_wb)
     }
 }
@@ -114,16 +115,28 @@ impl<A: Activation> Layer for FeedLayer<A> {
 
     fn forward(&mut self, input: Column) {
         self.input = input;
-        self.sum = &(&self.weights * &self.input) + &self.bias;
+        self.sum = self.weights.dot(&self.input) + &self.bias;
         self.output = A::activate(self.sum.clone());
     }
 
     fn backward(&mut self, lr: f32) {
         let da_s = A::deactivate(self.sum.clone());
-        let da_w = &da_s * &self.ds_w();
-        let da_b = &da_s * &self.ds_b();
-        let dc_w = self.other.cost(da_w);
-        let dc_b = self.other.cost(da_b);
+        let da_w = da_s.dot(&self.ds_w());
+        let da_b = da_s.dot(&self.ds_b());
+        let dc_w = self
+            .other
+            .cost(da_w)
+            .into_shape(self.weights.shape())
+            .unwrap()
+            .into_dimensionality::<Ix2>()
+            .unwrap();
+        let dc_b = self
+            .other
+            .cost(da_b)
+            .into_shape(self.bias.shape())
+            .unwrap()
+            .into_dimensionality::<Ix2>()
+            .unwrap();
         self.weights = &self.weights - lr * dc_w;
         self.bias = &self.bias - lr * dc_b;
     }
