@@ -1,76 +1,64 @@
-use super::layer::{Cost, CostObject, Layer, LayerBuilder};
-use super::loss::{Loss, LossBuilder};
+use super::layer::{Layer, LayerBuilder};
+use super::loss::Loss;
 use super::matrix::{Column, Matrix};
+use std::marker::PhantomData;
 use std::mem;
 
 pub struct ModelBuilder {
-    layers: Vec<Box<dyn LayerBuilder>>,
-    before: Vec<Vec<usize>>,
+    layers: Vec<Box<dyn Layer>>,
+    before: Vec<usize>,
 }
 
 impl ModelBuilder {
     pub fn new(before: Vec<usize>) -> Self {
         Self {
             layers: vec![],
-            before: vec![before],
+            before,
         }
     }
 
-    pub fn push_layer(&mut self, template: Box<dyn LayerBuilder>) {
-        self.before
-            .push(template.after(self.before[self.before.len() - 1].clone()));
-        self.layers.push(template);
+    pub fn push_layer<L: LayerBuilder>(&mut self, template: L) {
+        self.layers.push(template.build(self.before.clone()));
     }
 
-    pub fn compile<L: LossBuilder + Loss>(mut self, lr: f32) -> Model {
-        let mut model = Model::with_loss::<L>(lr, self.before.pop().unwrap());
-        for layer in self.layers.into_iter().rev() {
-            let cost = mem::replace(&mut model.cost, None).unwrap();
-            model.push_layer(layer.build(self.before.pop().unwrap(), cost));
-        }
-        model
-    }
-}
-
-pub struct Model {
-    cost: Option<CostObject>,
-    lr: f32,
-    after: Vec<usize>,
-}
-
-impl Model {
-    pub fn with_loss<L: LossBuilder + Loss>(lr: f32, after: Vec<usize>) -> Self {
-        Self {
-            cost: Some(CostObject::Loss(Box::new(L::new()))),
+    pub fn compile<L: Loss>(mut self, lr: f32) -> Model<L> {
+        Model::<L> {
             lr,
-            after,
+            layers: self.layers,
+            phantom: PhantomData,
         }
     }
+}
 
-    pub fn push_layer(&mut self, layer: Box<dyn Layer>) {
-        self.after = layer.before();
-        self.cost = Some(CostObject::Layer(layer));
-    }
+pub struct Model<L: Loss> {
+    lr: f32,
+    layers: Vec<Box<dyn Layer>>,
+    phantom: PhantomData<L>,
+}
 
+impl<L: Loss> Model<L> {
     pub fn train(&mut self, inputs: &[Column], targets: &[Column], epochs: u32) {
-        for _ in 0..epochs {
-            for x in 0..inputs.len() {
-                match self.cost.as_mut().unwrap() {
-                    CostObject::Layer(layer) => {
-                        layer.train(inputs[x].clone(), targets[x].clone(), self.lr)
-                    }
-                    CostObject::Loss(_) => (),
-                };
+        for e in 0..epochs {
+            for i in 0..inputs.len() {
+                let mut x = inputs[i].clone();
+                for l in 0..self.layers.len() {
+                    x = self.layers[l].forward(x);
+                }
+                let mut dc_y = L::backward(x, targets[i].clone());
+                for l in (0..self.layers.len()).rev() {
+                    dc_y = self.layers[l].backward(dc_y, self.lr);
+                }
             }
         }
     }
 
     pub fn test(&mut self, inputs: &[Column]) {
-        for x in 0..inputs.len() {
-            match self.cost.as_mut().unwrap() {
-                CostObject::Layer(layer) => layer.test(inputs[x].clone()),
-                CostObject::Loss(_) => (),
-            };
+        for i in 0..inputs.len() {
+            let mut x = inputs[i].clone();
+            for l in 0..self.layers.len() {
+                x = self.layers[l].forward(x);
+            }
+            println!("{}", x);
         }
     }
 }

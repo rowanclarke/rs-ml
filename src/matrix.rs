@@ -1,4 +1,5 @@
 use ndarray::{Array2, ArrayD, IxDyn};
+use rand::prelude::*;
 use std::fmt;
 use std::ops;
 
@@ -6,6 +7,7 @@ use std::ops;
 pub struct Matrix {
     matrix: Vec<f32>,
     shape: (usize, usize),
+    transpose: bool,
 }
 
 impl Matrix {
@@ -13,6 +15,7 @@ impl Matrix {
         Self {
             matrix: vec![0.0; shape.0 * shape.1],
             shape,
+            transpose: false,
         }
     }
 
@@ -21,10 +24,27 @@ impl Matrix {
         Self {
             matrix: vec![0.0; shape.0 * shape.1]
                 .into_iter()
-                .map(|x| 1.0)
+                .map(|_| rng.gen::<f32>())
                 .collect(),
             shape,
+            transpose: false,
         }
+    }
+
+    pub fn shape(&self) -> (usize, usize) {
+        if self.transpose {
+            (self.shape.1, self.shape.0)
+        } else {
+            self.shape
+        }
+    }
+
+    pub fn reshape(&mut self, shape: (usize, usize)) {
+        self.shape = shape;
+    }
+
+    pub fn transpose(&mut self) {
+        self.transpose = true;
     }
 }
 
@@ -48,9 +68,9 @@ impl<'a, 'b> ops::Mul<&'b Column> for &'a Matrix {
     type Output = Column;
 
     fn mul(self, rhs: &'b Column) -> Column {
-        let mut result = Column::zeros(self.shape.0);
-        for i in 0..self.shape.0 {
-            for k in 0..self.shape.1 {
+        let mut result = Column::zeros(self.shape().0);
+        for i in 0..self.shape().0 {
+            for k in 0..self.shape().1 {
                 result[i] += self[(i, k)] * rhs[k];
             }
         }
@@ -58,11 +78,39 @@ impl<'a, 'b> ops::Mul<&'b Column> for &'a Matrix {
     }
 }
 
+impl<'a> ops::Mul<f32> for &'a Matrix {
+    type Output = Matrix;
+
+    fn mul(self, rhs: f32) -> Matrix {
+        let mut result = Matrix::zeros((self.shape.0, self.shape.1));
+        for i in 0..self.shape.0 {
+            for j in 0..self.shape.1 {
+                result[(i, j)] = self[(i, j)] * rhs;
+            }
+        }
+        result
+    }
+}
+
+impl<'a> ops::SubAssign<&'a Matrix> for Matrix {
+    fn sub_assign(&mut self, rhs: &'a Matrix) {
+        for i in 0..self.shape.0 {
+            for j in 0..self.shape.1 {
+                self[(i, j)] -= rhs[(i, j)];
+            }
+        }
+    }
+}
+
 impl ops::Index<(usize, usize)> for Matrix {
     type Output = f32;
 
     fn index(&self, a: (usize, usize)) -> &f32 {
-        &self.matrix[a.0 * self.shape.1 + a.1]
+        if self.transpose {
+            &self.matrix[a.1 * self.shape.0 + a.0]
+        } else {
+            &self.matrix[a.0 * self.shape.1 + a.1]
+        }
     }
 }
 
@@ -78,6 +126,10 @@ pub struct Column {
 }
 
 impl Column {
+    pub fn new(column: Vec<f32>) -> Self {
+        Self { column }
+    }
+
     pub fn zeros(shape: usize) -> Self {
         Self {
             column: vec![0.0; shape],
@@ -87,7 +139,20 @@ impl Column {
     pub fn random(shape: usize) -> Self {
         let mut rng = rand::thread_rng();
         Self {
-            column: vec![0.0; shape].into_iter().map(|x| 1.0).collect(),
+            column: vec![0.0; shape]
+                .into_iter()
+                .map(|x| rng.gen::<f32>())
+                .collect(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.column.len()
+    }
+
+    pub fn map<F: FnMut(f32) -> f32>(&mut self, mut f: F) {
+        for i in 0..self.len() {
+            self.column[i] = f(self.column[i]);
         }
     }
 
@@ -95,10 +160,11 @@ impl Column {
         Matrix {
             shape: (self.column.len(), 1),
             matrix: self.column,
+            transpose: false,
         }
     }
 
-    pub fn to_shape(self, ix: IxDyn) -> ArrayD<f32> {
+    pub fn to_arr(self, ix: IxDyn) -> ArrayD<f32> {
         ArrayD::<f32>::from_shape_vec(ix, self.column).unwrap()
     }
 }
@@ -107,11 +173,31 @@ impl<'a, 'b> ops::Add<&'b Column> for &'a Column {
     type Output = Column;
 
     fn add(self, rhs: &'b Column) -> Column {
-        let result = Column::zeros(self.column.len());
+        let mut result = Column::zeros(self.column.len());
         for i in 0..self.column.len() {
             result[i] = self.column[i] + rhs.column[i];
         }
         result
+    }
+}
+
+impl<'a> ops::Mul<f32> for &'a Column {
+    type Output = Column;
+
+    fn mul(self, rhs: f32) -> Column {
+        let mut result = Column::zeros(self.len());
+        for i in 0..self.len() {
+            result[i] = self[i] * rhs;
+        }
+        result
+    }
+}
+
+impl<'a> ops::SubAssign<&'a Column> for Column {
+    fn sub_assign(&mut self, rhs: &'a Column) {
+        for i in 0..self.len() {
+            self[i] -= rhs[i];
+        }
     }
 }
 

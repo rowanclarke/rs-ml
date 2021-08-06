@@ -8,5 +8,5 @@ edition = "2018"
 
 [dependencies]
 ndarray = "0.15.3"
-rand = "0.8.4"
 mnist = "0.4.1"
+rand = "0.8.4"
