@@ -1,6 +1,6 @@
 use super::super::{
     activation::Activation,
-    matrix::{Column, Jacobean, Matrix},
+    matrix::{Column, Jacobean},
 };
 
 pub struct Sigmoid {}

@@ -1,4 +1,4 @@
-use ndarray::{Array2, ArrayD, IxDyn};
+use ndarray::{ArrayBase, Dimension, OwnedRepr, StrideShape, ViewRepr};
 use rand::prelude::*;
 use std::fmt;
 use std::ops;
@@ -44,7 +44,7 @@ impl Matrix {
     }
 
     pub fn transpose(&mut self) {
-        self.transpose = true;
+        self.transpose = !self.transpose;
     }
 }
 
@@ -52,10 +52,10 @@ impl<'a, 'b> ops::Mul<&'b Matrix> for &'a Matrix {
     type Output = Matrix;
 
     fn mul(self, rhs: &'b Matrix) -> Matrix {
-        let mut result = Matrix::zeros((self.shape.0, rhs.shape.1));
-        for i in 0..self.shape.0 {
-            for j in 0..rhs.shape.1 {
-                for k in 0..self.shape.1 {
+        let mut result = Matrix::zeros((self.shape().0, rhs.shape().1));
+        for i in 0..self.shape().0 {
+            for j in 0..rhs.shape().1 {
+                for k in 0..self.shape().1 {
                     result[(i, j)] += self[(i, k)] * rhs[(k, j)];
                 }
             }
@@ -69,6 +69,7 @@ impl<'a, 'b> ops::Mul<&'b Column> for &'a Matrix {
 
     fn mul(self, rhs: &'b Column) -> Column {
         let mut result = Column::zeros(self.shape().0);
+        println!("({} {})", self.shape().0, self.shape().1);
         for i in 0..self.shape().0 {
             for k in 0..self.shape().1 {
                 result[i] += self[(i, k)] * rhs[k];
@@ -83,8 +84,8 @@ impl<'a> ops::Mul<f32> for &'a Matrix {
 
     fn mul(self, rhs: f32) -> Matrix {
         let mut result = Matrix::zeros((self.shape.0, self.shape.1));
-        for i in 0..self.shape.0 {
-            for j in 0..self.shape.1 {
+        for i in 0..self.shape().0 {
+            for j in 0..self.shape().1 {
                 result[(i, j)] = self[(i, j)] * rhs;
             }
         }
@@ -94,8 +95,8 @@ impl<'a> ops::Mul<f32> for &'a Matrix {
 
 impl<'a> ops::SubAssign<&'a Matrix> for Matrix {
     fn sub_assign(&mut self, rhs: &'a Matrix) {
-        for i in 0..self.shape.0 {
-            for j in 0..self.shape.1 {
+        for i in 0..self.shape().0 {
+            for j in 0..self.shape().1 {
                 self[(i, j)] -= rhs[(i, j)];
             }
         }
@@ -106,17 +107,14 @@ impl ops::Index<(usize, usize)> for Matrix {
     type Output = f32;
 
     fn index(&self, a: (usize, usize)) -> &f32 {
-        if self.transpose {
-            &self.matrix[a.1 * self.shape.0 + a.0]
-        } else {
-            &self.matrix[a.0 * self.shape.1 + a.1]
-        }
+        &self.matrix[a.0 * self.shape().1 + a.1]
     }
 }
 
 impl ops::IndexMut<(usize, usize)> for Matrix {
     fn index_mut(&mut self, a: (usize, usize)) -> &mut f32 {
-        &mut self.matrix[a.0 * self.shape.1 + a.1]
+        let s = self.shape().1;
+        &mut self.matrix[a.0 * s + a.1]
     }
 }
 
@@ -141,7 +139,7 @@ impl Column {
         Self {
             column: vec![0.0; shape]
                 .into_iter()
-                .map(|x| rng.gen::<f32>())
+                .map(|_| rng.gen::<f32>())
                 .collect(),
         }
     }
@@ -164,8 +162,15 @@ impl Column {
         }
     }
 
-    pub fn to_arr(self, ix: IxDyn) -> ArrayD<f32> {
-        ArrayD::<f32>::from_shape_vec(ix, self.column).unwrap()
+    pub fn to_arr<D: Dimension, Sh: Into<StrideShape<D>>>(
+        self,
+        shape: Sh,
+    ) -> ArrayBase<OwnedRepr<f32>, D> {
+        ArrayBase::<OwnedRepr<f32>, D>::from_shape_vec(shape, self.column).unwrap()
+    }
+
+    pub fn from_arr<D: Dimension>(array: ArrayBase<OwnedRepr<f32>, D>) -> Column {
+        Column::new(array.into_raw_vec())
     }
 }
 

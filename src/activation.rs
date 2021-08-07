@@ -1,4 +1,6 @@
+pub mod relu;
 pub mod sigmoid;
+pub mod softmax;
 
 use super::matrix::{Column, Jacobean};
 

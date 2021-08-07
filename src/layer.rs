@@ -1,7 +1,8 @@
+pub mod conv2d;
 pub mod feed;
+pub mod reshape;
 
-use super::loss::Loss;
-use super::matrix::{Column, Jacobean};
+use super::matrix::Column;
 use std::any::Any;
 
 pub trait Layer: Any {
@@ -12,5 +13,5 @@ pub trait Layer: Any {
 }
 
 pub trait LayerBuilder {
-    fn build(&self, before: Vec<usize>) -> Box<dyn Layer>;
+    fn build(self, before: Vec<usize>) -> Box<dyn Layer>;
 }

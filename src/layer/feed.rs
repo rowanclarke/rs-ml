@@ -1,10 +1,8 @@
 use super::super::{
     activation::Activation,
-    matrix::{Column, Jacobean, Matrix},
+    matrix::{Column, Matrix},
 };
 use super::{Layer, LayerBuilder};
-use ndarray::Ix2;
-use rand::prelude::*;
 use std::marker::PhantomData;
 
 pub struct Feed<A: Activation> {
@@ -22,7 +20,7 @@ impl<A: Activation> Feed<A> {
 }
 
 impl<A: Activation> LayerBuilder for Feed<A> {
-    fn build(&self, before: Vec<usize>) -> Box<dyn Layer> {
+    fn build(self, before: Vec<usize>) -> Box<dyn Layer> {
         Box::new(FeedLayer::<A> {
             weights: Matrix::random((self.after, before[0])),
             bias: Column::random(self.after),
@@ -45,30 +43,6 @@ pub struct FeedLayer<A: Activation> {
     before: usize,
     after: usize,
     phantom: PhantomData<A>,
-}
-
-impl<A: Activation> FeedLayer<A> {
-    pub fn ds_x(&self) -> Jacobean {
-        self.weights.clone()
-    }
-
-    pub fn ds_w(&self) -> Jacobean {
-        let mut ds_w = Jacobean::zeros((self.after, self.after * self.before));
-        for i in 0..self.after {
-            for j in 0..self.before {
-                ds_w[(i, i * self.before + j)] = self.input[j];
-            }
-        }
-        ds_w
-    }
-
-    pub fn ds_b(&self) -> Jacobean {
-        let mut ds_b = Jacobean::zeros((self.after, self.after));
-        for i in 0..self.after {
-            ds_b[(i, i)] = 1.0;
-        }
-        ds_b
-    }
 }
 
 impl<A: Activation> Layer for FeedLayer<A> {
