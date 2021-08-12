@@ -59,7 +59,7 @@ impl Layer for ReshapeLayer {
         input
     }
 
-    fn backward(&mut self, target: Column, lr: f32) -> Column {
+    fn backward(&mut self, target: Column, _: f32) -> Column {
         target
     }
 }

@@ -38,19 +38,15 @@ pub struct Model<L: Loss> {
 }
 
 impl<L: Loss> Model<L> {
-    pub fn train(&mut self, inputs: &[Column], targets: &[Column], epochs: u32) {
+    pub fn train(&mut self, inputs: Box<[Column]>, targets: Box<[Column]>, epochs: u32) {
         for e in 0..epochs {
             for i in 0..inputs.len() {
                 let mut x = inputs[i].clone();
                 for l in 0..self.layers.len() {
-                    println!(
-                        "{}, {:?}, {:?}",
-                        x.len(),
-                        self.layers[l].before(),
-                        self.layers[l].after()
-                    );
                     x = self.layers[l].forward(x);
                 }
+                let cost = L::forward(x.clone(), targets[i].clone());
+                println!("{}: cost: {}", e, cost);
                 let mut dc_y = L::backward(x, targets[i].clone());
                 for l in (0..self.layers.len()).rev() {
                     dc_y = self.layers[l].backward(dc_y, self.lr);
@@ -59,7 +55,7 @@ impl<L: Loss> Model<L> {
         }
     }
 
-    pub fn test(&mut self, inputs: &[Column]) {
+    pub fn test(&mut self, inputs: Box<[Column]>) {
         for i in 0..inputs.len() {
             let mut x = inputs[i].clone();
             for l in 0..self.layers.len() {

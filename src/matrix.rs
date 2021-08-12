@@ -1,4 +1,4 @@
-use ndarray::{ArrayBase, Dimension, OwnedRepr, StrideShape, ViewRepr};
+use ndarray::{ArrayBase, Dimension, OwnedRepr, StrideShape};
 use rand::prelude::*;
 use std::fmt;
 use std::ops;
@@ -69,7 +69,6 @@ impl<'a, 'b> ops::Mul<&'b Column> for &'a Matrix {
 
     fn mul(self, rhs: &'b Column) -> Column {
         let mut result = Column::zeros(self.shape().0);
-        println!("({} {})", self.shape().0, self.shape().1);
         for i in 0..self.shape().0 {
             for k in 0..self.shape().1 {
                 result[i] += self[(i, k)] * rhs[k];
@@ -115,6 +114,12 @@ impl ops::IndexMut<(usize, usize)> for Matrix {
     fn index_mut(&mut self, a: (usize, usize)) -> &mut f32 {
         let s = self.shape().1;
         &mut self.matrix[a.0 * s + a.1]
+    }
+}
+
+impl fmt::Display for Matrix {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.matrix)
     }
 }
 
@@ -217,6 +222,12 @@ impl ops::Index<usize> for Column {
 impl ops::IndexMut<usize> for Column {
     fn index_mut(&mut self, a: usize) -> &mut f32 {
         &mut self.column[a]
+    }
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        self.column == other.column
     }
 }
 

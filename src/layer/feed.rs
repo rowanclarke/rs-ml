@@ -62,12 +62,12 @@ impl<A: Activation> Layer for FeedLayer<A> {
     }
 
     fn backward(&mut self, dc_y: Column, lr: f32) -> Column {
-        let da = A::deactivate(self.sum.clone());
-        let dc_a = &da * &dc_y;
+        let dy_s = A::deactivate(self.sum.clone());
+        let dc_s = &dy_s * &dc_y;
         let mut ds_w = Matrix::zeros((self.after * self.before, self.after));
         for i in 0..self.after {
             for j in 0..self.before {
-                ds_w[(i * self.after + j, i)] = self.input[j];
+                ds_w[(i * self.before + j, i)] = self.input[j];
             }
         }
         let mut ds_b = Matrix::zeros((self.after, self.after));
@@ -76,10 +76,11 @@ impl<A: Activation> Layer for FeedLayer<A> {
         }
         let mut ds_x = self.weights.clone();
         ds_x.transpose();
-        let mut lr_dc_w = (&(&ds_w * &dc_a) * lr).to_mat();
+        let dc_w = &ds_w * &dc_s;
+        let mut lr_dc_w = (&dc_w * lr).to_mat();
         lr_dc_w.reshape(self.weights.shape());
         self.weights -= &lr_dc_w;
-        self.bias -= &(&(&ds_b * &dc_a) * lr);
-        &ds_x * &dc_a
+        self.bias -= &(&(&ds_b * &dc_s) * lr);
+        &ds_x * &dc_s
     }
 }

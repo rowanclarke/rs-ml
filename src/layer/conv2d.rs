@@ -69,9 +69,12 @@ impl<A: Activation> Layer for Conv2DLayer<A> {
     }
 
     fn forward(&mut self, input: Column) -> Column {
-        self.input = input.to_arr((self.before[0], self.before[1], self.before[2]));
+        self.input = input
+            .clone()
+            .to_arr((self.before[0], self.before[1], self.before[2]));
         Self::convolution(&self.input, &self.filter, &mut self.sum);
         let sum = Column::from_arr(self.sum.clone());
+        //asserteq!(sum, (&self.ds_x() * &input));
         let output = A::activate(sum);
         self.output = output
             .clone()
@@ -81,21 +84,15 @@ impl<A: Activation> Layer for Conv2DLayer<A> {
 
     fn backward(&mut self, dc_y: Column, lr: f32) -> Column {
         let sum = Column::from_arr(self.sum.clone());
-        let mut delf = Array4::<f32>::zeros(self.filter.raw_dim());
-        let da = A::deactivate(sum);
+        let mut dc_f = Array4::<f32>::zeros(self.filter.raw_dim());
+        let dy_s = A::deactivate(sum);
         let mut ds_x = self.ds_x();
         ds_x.transpose();
-        let dc_a = &da * &dc_y;
-        println!(
-            ">> ({}, {}), {}",
-            ds_x.shape().0,
-            ds_x.shape().1,
-            dc_a.len()
-        );
-        let dc_x = &ds_x * &dc_a;
-        let dc_a = dc_a.to_arr((self.after[0], self.after[1], self.after[2]));
-        Self::back_convolution(&self.input, &dc_a, &mut delf);
-        self.filter = &self.filter - &(lr * delf);
+        let dc_s = &dy_s * &dc_y;
+        let dc_x = &ds_x * &dc_s;
+        let dc_s = dc_s.to_arr((self.after[0], self.after[1], self.after[2]));
+        Self::back_convolution(&self.input, &dc_s, &mut dc_f);
+        self.filter = &self.filter - &(lr * dc_f);
         dc_x
     }
 }
