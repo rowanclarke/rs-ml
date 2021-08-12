@@ -1,9 +1,10 @@
+use super::super::matrix::{Column, Jacobean};
 use super::Activation;
 
 pub struct Softmax {}
 
 impl Activation for Softmax {
-    fn activate(mut vec: Vec<f32>) -> Vec<f32> {
+    fn activate(mut vec: Column) -> Column {
         let mut sum = 0.0;
         let mut max = f32::MIN;
         for i in 0..vec.len() {
@@ -19,15 +20,15 @@ impl Activation for Softmax {
         vec
     }
 
-    fn deactivate(vec: Vec<f32>) -> Vec<f32> {
-        let mut del = vec![0.0; vec.len() * vec.len()];
+    fn deactivate(vec: Column) -> Jacobean {
+        let mut del = Jacobean::zeros((vec.len(), vec.len()));
         let vec = Self::activate(vec);
         for i in 0..vec.len() {
             for j in 0..vec.len() {
                 if i == j {
-                    del[i * vec.len() + j] = vec[i] * (1.0 - vec[j]);
+                    del[(i, j)] = vec[i] * (1.0 - vec[j]);
                 } else {
-                    del[i * vec.len() + j] = -vec[j] * vec[i];
+                    del[(i, j)] = -vec[j] * vec[i];
                 }
             }
         }

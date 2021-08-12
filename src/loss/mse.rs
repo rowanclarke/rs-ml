@@ -1,34 +1,25 @@
-use super::{Cost, Loss, LossBuilder};
-use ndarray::Array2;
+use super::super::matrix::Column;
+use super::Loss;
 
-pub struct MeanSquaredError {}
-
-impl Cost for MeanSquaredError {
-    fn cost(&self, given: Array2<f32>) -> Array2<f32> {
-        given
-    }
+pub struct MeanSquaredError {
+    output: Column,
+    target: Column,
 }
 
 impl Loss for MeanSquaredError {
-    fn forward(&self, output: Array2<f32>, target: Array2<f32>) -> f32 {
+    fn forward(output: Column, target: Column) -> f32 {
         let mut sum = 0.0;
         for i in 0..output.len() {
-            sum += (output[[i, 0]] - target[[i, 0]]).powf(2.0);
+            sum += (output[i] - target[i]).powf(2.0);
         }
-        sum / output.len() as f32
+        sum
     }
 
-    fn backward(&self, output: Array2<f32>, target: Array2<f32>) -> Array2<f32> {
-        let mut del = Array2::zeros((1, output.len()));
+    fn backward(output: Column, target: Column) -> Column {
+        let mut result = Column::zeros(output.len());
         for i in 0..output.len() {
-            del[[i, 0]] = 2.0 / output.len() as f32 * (output[[i, 0]] - target[[i, 0]]);
+            result[i] = 2.0 * (output[i] - target[i]);
         }
-        del
-    }
-}
-
-impl LossBuilder for MeanSquaredError {
-    fn new() -> Self {
-        Self {}
+        result
     }
 }

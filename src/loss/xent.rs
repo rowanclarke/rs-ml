@@ -1,9 +1,10 @@
-use super::{Loss, LossBuilder};
+use super::super::matrix::Column;
+use super::Loss;
 
 pub struct CrossEntropy {}
 
 impl Loss for CrossEntropy {
-    fn forward(&self, output: Vec<f32>, target: Vec<f32>) -> f32 {
+    fn forward(output: Column, target: Column) -> f32 {
         let mut sum = 0.0;
         for i in 0..output.len() {
             sum += target[i] * output[i].ln();
@@ -11,17 +12,11 @@ impl Loss for CrossEntropy {
         -sum
     }
 
-    fn backward(&self, output: Vec<f32>, target: Vec<f32>) -> Vec<f32> {
-        let mut del = vec![0.0; output.len()];
+    fn backward(output: Column, target: Column) -> Column {
+        let mut del = Column::zeros(output.len());
         for i in 0..output.len() {
             del[i] = -target[i] * output[i].recip();
         }
         del
-    }
-}
-
-impl LossBuilder for CrossEntropy {
-    fn new() -> Self {
-        Self {}
     }
 }
