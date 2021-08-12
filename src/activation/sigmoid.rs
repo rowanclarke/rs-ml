@@ -1,16 +1,24 @@
-use super::Activation;
+use super::super::{
+    activation::Activation,
+    matrix::{Column, Jacobean},
+};
 
 pub struct Sigmoid {}
 
 impl Activation for Sigmoid {
-    fn activate(vec: Vec<f32>) -> Vec<f32> {
-        vec.into_iter().map(|x| 1.0 / (1.0 + (-x).exp())).collect()
+    fn activate(mut vec: Column) -> Column {
+        vec.map(|x| (-x).exp());
+        vec.map(|x| 1.0 / (1.0 + x));
+        vec
     }
 
-    fn deactivate(vec: Vec<f32>) -> Vec<f32> {
-        Self::activate(vec)
-            .into_iter()
-            .map(|x| x * (1.0 - x))
-            .collect()
+    fn deactivate(vec: Column) -> Jacobean {
+        let mut vec = Self::activate(vec);
+        vec.map(|x| x * (1.0 - x));
+        let mut da = Jacobean::zeros((vec.len(), vec.len()));
+        for i in 0..vec.len() {
+            da[(i, i)] = vec[i];
+        }
+        da
     }
 }

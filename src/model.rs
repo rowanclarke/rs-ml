@@ -1,62 +1,67 @@
-use super::layer::{series::Series, Dynamic, Fixed, Group, Layer, Object};
-use std::mem;
+use super::layer::{Layer, LayerBuilder};
+use super::loss::Loss;
+use super::matrix::Column;
+use std::marker::PhantomData;
 
-pub struct Model {
-    stack: Vec<Box<dyn Group>>,
-    series: Box<Series>,
+pub struct ModelBuilder {
+    layers: Vec<Box<dyn Layer>>,
+    before: Vec<usize>,
 }
 
-impl Model {
-    pub fn new(size: usize) -> Self {
+impl ModelBuilder {
+    pub fn new(before: Vec<usize>) -> Self {
         Self {
-            stack: Vec::new(),
-            series: Box::new(Series::new(size)),
+            layers: vec![],
+            before,
         }
     }
 
-    fn last(&mut self) -> &mut dyn Group {
-        let len = self.stack.len();
-        if len == 0 {
-            return self.series.as_mut();
-        } else {
-            return self.stack[len].as_mut();
+    pub fn push_layer<L: LayerBuilder>(&mut self, template: L) {
+        let layer = template.build(self.before.clone());
+        self.before = layer.after();
+        self.layers.push(layer);
+    }
+
+    pub fn compile<L: Loss>(self, lr: f32) -> Model<L> {
+        Model::<L> {
+            lr,
+            layers: self.layers,
+            phantom: PhantomData,
         }
     }
+}
 
-    pub fn push_group<G: Group + Dynamic>(&mut self) {
-        // Pushed group must go onto stack
-        let size = self.last().after();
-        self.stack.push(Box::new(G::new(size)));
-    }
+pub struct Model<L: Loss> {
+    lr: f32,
+    layers: Vec<Box<dyn Layer>>,
+    phantom: PhantomData<L>,
+}
 
-    pub fn pop_group(&mut self) {
-        // Popped group must be from stack
-        let group = self.stack.pop().unwrap();
-        self.last().push(Object::Group(group));
-    }
-
-    pub fn push_layer<L: Layer + Fixed>(&mut self, after: usize) {
-        let last = self.last();
-        let before = last.before();
-        last.push(Object::Layer(Box::new(L::new(before, after))));
-    }
-
-    pub fn train(&mut self, inputs: &[Vec<f32>], targets: &[Vec<f32>], epochs: u32, lr: f32) {
+impl<L: Loss> Model<L> {
+    pub fn train(&mut self, inputs: Box<[Column]>, targets: Box<[Column]>, epochs: u32) {
         for e in 0..epochs {
-            for x in 0..inputs.len() {
-                let output = self.series.forward(inputs[x].clone());
-                if (e % 500) == 0 {
-                    let mut cost = 0.0;
-                    for i in 0..self.series.after() {
-                        cost += (output[i] - targets[x][i]).powf(2.0);
-                    }
-                    println!(
-                        "Epoch: {}, Input: {:?}, Output: {:?}, Cost: {}",
-                        e, inputs[x], output, cost
-                    );
+            for i in 0..inputs.len() {
+                let mut x = inputs[i].clone();
+                for l in 0..self.layers.len() {
+                    x = self.layers[l].forward(x);
                 }
-                self.series.backward(targets[x].clone(), lr);
+                let cost = L::forward(x.clone(), targets[i].clone());
+                println!("{}: cost: {}", e, cost);
+                let mut dc_y = L::backward(x, targets[i].clone());
+                for l in (0..self.layers.len()).rev() {
+                    dc_y = self.layers[l].backward(dc_y, self.lr);
+                }
             }
+        }
+    }
+
+    pub fn test(&mut self, inputs: Box<[Column]>) {
+        for i in 0..inputs.len() {
+            let mut x = inputs[i].clone();
+            for l in 0..self.layers.len() {
+                x = self.layers[l].forward(x);
+            }
+            println!("{}", x);
         }
     }
 }

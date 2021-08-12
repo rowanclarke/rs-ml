@@ -1,72 +1,86 @@
-extern crate ndarray;
-extern crate rand;
-
-use super::super::activation::Activation;
-use super::{Fixed, Layer};
-use ndarray::{Array1, Array2};
-use rand::prelude::*;
+use super::super::{
+    activation::Activation,
+    matrix::{Column, Matrix},
+};
+use super::{Layer, LayerBuilder};
 use std::marker::PhantomData;
 
 pub struct Feed<A: Activation> {
-    weights: Array2<f32>,
-    bias: Array1<f32>,
-    before: usize,
     after: usize,
-    input: Vec<f32>,
-    sum: Vec<f32>,
-    output: Vec<f32>,
     phantom: PhantomData<A>,
 }
 
-impl<A: Activation> Fixed for Feed<A> {
-    fn new(before: usize, after: usize) -> Self {
-        let mut rng = rand::thread_rng();
+impl<A: Activation> Feed<A> {
+    pub fn new(after: usize) -> Self {
         Self {
-            weights: Array2::<f32>::zeros((before, after)).map(|_| rng.gen::<f32>()),
-            bias: Array1::<f32>::zeros(after).map(|_| rng.gen::<f32>()),
-            before,
             after,
-            input: Vec::new(),
-            sum: Vec::new(),
-            output: Vec::new(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<A: Activation> Layer for Feed<A> {
-    fn before(&self) -> usize {
-        self.before
+impl<A: Activation> LayerBuilder for Feed<A> {
+    fn build(self, before: Vec<usize>) -> Box<dyn Layer> {
+        Box::new(FeedLayer::<A> {
+            weights: Matrix::random((self.after, before[0])),
+            bias: Column::random(self.after),
+            input: Column::zeros(before[0]),
+            sum: Column::zeros(self.after),
+            output: Column::zeros(self.after),
+            before: before[0],
+            after: self.after,
+            phantom: PhantomData,
+        })
+    }
+}
+
+pub struct FeedLayer<A: Activation> {
+    pub weights: Matrix,
+    pub bias: Column,
+    input: Column,
+    sum: Column,
+    output: Column,
+    before: usize,
+    after: usize,
+    phantom: PhantomData<A>,
+}
+
+impl<A: Activation> Layer for FeedLayer<A> {
+    fn before(&self) -> Vec<usize> {
+        vec![self.before]
     }
 
-    fn after(&self) -> usize {
-        self.after
+    fn after(&self) -> Vec<usize> {
+        vec![self.after]
     }
 
-    fn forward(&mut self, input: Vec<f32>) -> Vec<f32> {
+    fn forward(&mut self, input: Column) -> Column {
         self.input = input;
-        self.sum = vec![0.0; self.after];
-        for i in 0..self.after {
-            self.sum[i] += self.bias[i];
-            for j in 0..self.before {
-                self.sum[i] += self.weights[[j, i]] * self.input[j];
-            }
-        }
+        self.sum = &(&self.weights * &self.input) + &self.bias;
         self.output = A::activate(self.sum.clone());
         self.output.clone()
     }
 
-    fn backward(&mut self, target: Vec<f32>, lr: f32) -> Vec<f32> {
-        let mut result = self.input.clone();
-        let del = A::deactivate(self.sum.clone());
+    fn backward(&mut self, dc_y: Column, lr: f32) -> Column {
+        let dy_s = A::deactivate(self.sum.clone());
+        let dc_s = &dy_s * &dc_y;
+        let mut ds_w = Matrix::zeros((self.after * self.before, self.after));
         for i in 0..self.after {
-            let buffer = lr * 2.0 * (self.output[i] - target[i]) * del[i];
-            self.bias[i] -= buffer;
             for j in 0..self.before {
-                result[j] -= buffer * self.weights[[j, i]];
-                self.weights[[j, i]] -= buffer * self.input[j];
+                ds_w[(i * self.before + j, i)] = self.input[j];
             }
         }
-        result
+        let mut ds_b = Matrix::zeros((self.after, self.after));
+        for i in 0..self.after {
+            ds_b[(i, i)] = 1.0;
+        }
+        let mut ds_x = self.weights.clone();
+        ds_x.transpose();
+        let dc_w = &ds_w * &dc_s;
+        let mut lr_dc_w = (&dc_w * lr).to_mat();
+        lr_dc_w.reshape(self.weights.shape());
+        self.weights -= &lr_dc_w;
+        self.bias -= &(&(&ds_b * &dc_s) * lr);
+        &ds_x * &dc_s
     }
 }
