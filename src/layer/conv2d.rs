@@ -3,6 +3,7 @@ use super::super::loss::Loss;
 use super::{Layer, Template};
 use ndarray::{Array1, Array2, Array3, Array4};
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 pub struct Conv2D<A: Activation> {
@@ -47,6 +48,7 @@ impl<A: Activation> Template<Conv2DLayer<A>> for Conv2D<A> {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Conv2DLayer<A: Activation> {
     filter: Array4<f32>,
     input: Array3<f32>,
@@ -197,6 +199,7 @@ impl Template<MaxPooling2DLayer> for MaxPooling2D {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct MaxPooling2DLayer {
     pool_size: (usize, usize),
     input: Array3<f32>,

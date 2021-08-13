@@ -4,6 +4,7 @@ pub mod feed;
 pub mod series;
 //pub mod parallel;
 
+<<<<<<< Updated upstream
 use super::loss::Loss;
 use ndarray::Array2;
 use std::any::*;
@@ -13,6 +14,14 @@ pub trait Cost {
 }
 
 pub trait Layer: Cost + Any {
+=======
+use super::matrix::Column;
+use erased_serde::serialize_trait_object;
+use erased_serde::Serialize;
+use std::any::Any;
+
+pub trait Layer: Any + Serialize {
+>>>>>>> Stashed changes
     fn before(&self) -> Vec<usize>;
     fn after(&self) -> Vec<usize>;
     fn forward(&mut self, input: Array2<f32>) -> Array2<f32>;
@@ -87,6 +96,13 @@ pub trait Template<L: Layer> {
     fn into(self, before: Vec<usize>) -> L;
 }
 
+<<<<<<< Updated upstream
 pub trait Dynamic {
     fn new(before: Vec<usize>) -> Self;
+=======
+serialize_trait_object!(Layer);
+
+pub trait LayerBuilder {
+    fn build(self, before: Vec<usize>) -> Box<dyn Layer>;
+>>>>>>> Stashed changes
 }

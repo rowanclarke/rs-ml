@@ -1,7 +1,15 @@
+<<<<<<< Updated upstream
 use super::layer::{series::Series, Cost, CostObject, Dynamic, Group, Layer, Object, Template};
 use super::loss::{mse::MeanSquaredError, Loss, LossBuilder};
 use ndarray::prelude::Array2;
 use std::mem;
+=======
+use super::layer::{Layer, LayerBuilder};
+use super::loss::Loss;
+use super::matrix::Column;
+use serde::Serialize;
+use std::marker::PhantomData;
+>>>>>>> Stashed changes
 
 pub struct Model {
     stack: Vec<Box<dyn Group>>,
@@ -35,11 +43,20 @@ impl Model {
         self.stack.push(Box::new(G::new(size)));
     }
 
+<<<<<<< Updated upstream
     pub fn pop_group(&mut self) {
         // Popped group must be from stack
         let group = self.stack.pop().unwrap();
         self.last().push(Object::Group(group));
     }
+=======
+#[derive(Serialize)]
+pub struct Model<L: Loss> {
+    lr: f32,
+    layers: Vec<Box<dyn Layer>>,
+    phantom: PhantomData<L>,
+}
+>>>>>>> Stashed changes
 
     pub fn push_layer<L: Layer, T: Template<L>>(&mut self, template: T) {
         let last = self.last();

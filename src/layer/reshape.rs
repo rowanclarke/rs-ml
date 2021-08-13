@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 use super::super::loss::Loss;
 use super::{Layer, Template};
 use std::iter::Product;
@@ -20,6 +21,11 @@ impl Template<ReshapeLayer> for Reshape {
         }
     }
 }
+=======
+use super::super::matrix::Column;
+use super::{Layer, LayerBuilder};
+use serde::{Deserialize, Serialize};
+>>>>>>> Stashed changes
 
 pub struct Flatten {}
 
@@ -42,6 +48,7 @@ impl Template<ReshapeLayer> for Flatten {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ReshapeLayer {
     before: Vec<usize>,
     after: Vec<usize>,

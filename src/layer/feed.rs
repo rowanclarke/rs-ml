@@ -1,8 +1,17 @@
+<<<<<<< Updated upstream
 use super::super::activation::Activation;
 use super::super::loss::Loss;
 use super::{Cost, CostObject, Layer, Template};
 use ndarray::{Array1, Array2};
 use rand::prelude::*;
+=======
+use super::super::{
+    activation::Activation,
+    matrix::{Column, Matrix},
+};
+use super::{Layer, LayerBuilder};
+use serde::{Deserialize, Serialize};
+>>>>>>> Stashed changes
 use std::marker::PhantomData;
 
 pub struct Feed<A: Activation> {
@@ -35,6 +44,7 @@ impl<A: Activation> Template<FeedLayer<A>> for Feed<A> {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct FeedLayer<A: Activation> {
     weights: Array2<f32>,
     bias: Array2<f32>,
