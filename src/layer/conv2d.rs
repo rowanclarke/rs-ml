@@ -1,7 +1,9 @@
-use super::super::activation::Activation;
-use super::super::loss::Loss;
-use super::{Layer, Template};
-use ndarray::{Array1, Array2, Array3, Array4};
+use super::super::{
+    activation::Activation,
+    matrix::{Column, Jacobean},
+};
+use super::{Layer, LayerBuilder};
+use ndarray::{Array3, Array4};
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -22,15 +24,15 @@ impl<A: Activation> Conv2D<A> {
     }
 }
 
-impl<A: Activation> Template<Conv2DLayer<A>> for Conv2D<A> {
-    fn into(self, before: Vec<usize>) -> Conv2DLayer<A> {
+impl<A: Activation> LayerBuilder for Conv2D<A> {
+    fn build(self, before: Vec<usize>) -> Box<dyn Layer> {
         let mut rng = rand::thread_rng();
         let after = vec![
             before[0] - self.kernel_size.0 + 1,
             before[1] - self.kernel_size.1 + 1,
             self.filters,
         ];
-        Conv2DLayer::<A> {
+        Box::new(Conv2DLayer::<A> {
             filter: Array4::<f32>::zeros((
                 self.kernel_size.0,
                 self.kernel_size.1,
@@ -44,7 +46,7 @@ impl<A: Activation> Template<Conv2DLayer<A>> for Conv2D<A> {
             before,
             after,
             phantom: PhantomData,
-        }
+        })
     }
 }
 
@@ -68,42 +70,60 @@ impl<A: Activation> Layer for Conv2DLayer<A> {
         self.after.clone()
     }
 
-    fn forward(&mut self, input: Vec<f32>) -> Vec<f32> {
-        self.input =
-            Array3::from_shape_vec((self.before[0], self.before[1], self.before[2]), input)
-                .unwrap();
+    fn forward(&mut self, input: Column) -> Column {
+        self.input = input
+            .clone()
+            .to_arr((self.before[0], self.before[1], self.before[2]));
         Self::convolution(&self.input, &self.filter, &mut self.sum);
-        self.output = Array3::from_shape_vec(
-            (self.after[0], self.after[1], self.after[2]),
-            A::activate(self.sum.clone().into_raw_vec()),
-        )
-        .unwrap();
-        self.output.clone().into_raw_vec()
+        let sum = Column::from_arr(self.sum.clone());
+        //asserteq!(sum, (&self.ds_x() * &input));
+        let output = A::activate(sum);
+        self.output = output
+            .clone()
+            .to_arr((self.after[0], self.after[1], self.after[2]));
+        output
     }
 
-    fn backward(&mut self, dele: Vec<f32>, lr: f32) -> Vec<f32> {
-        let lin = self.after[0] * self.after[1] * self.after[2];
-        let dele = Array2::from_shape_vec((1, lin), dele).unwrap();
-        let dela =
-            Array2::from_shape_vec((lin, lin), A::deactivate(self.sum.clone().into_raw_vec()))
-                .unwrap();
-        let mut delf = Array4::<f32>::zeros(self.filter.raw_dim());
-
-        let del = dele
-            .dot(&dela)
-            .into_shape((self.after[0], self.after[1], self.after[2]))
-            .unwrap();
-
-        Self::back_convolution(&self.input, &del, &mut delf);
-        Self::full_convolution_rot(&del, &self.filter, &mut self.input);
-
-        // TODO: Biases
-        self.filter = &self.filter - &(lr * delf);
-        (lr * &self.input).into_raw_vec()
+    fn backward(&mut self, dc_y: Column, lr: f32) -> Column {
+        let sum = Column::from_arr(self.sum.clone());
+        let mut dc_f = Array4::<f32>::zeros(self.filter.raw_dim());
+        let dy_s = A::deactivate(sum);
+        let mut ds_x = self.ds_x();
+        ds_x.transpose();
+        let dc_s = &dy_s * &dc_y;
+        let dc_x = &ds_x * &dc_s;
+        let dc_s = dc_s.to_arr((self.after[0], self.after[1], self.after[2]));
+        Self::back_convolution(&self.input, &dc_s, &mut dc_f);
+        self.filter = &self.filter - &(lr * dc_f);
+        dc_x
     }
 }
 
 impl<A: Activation> Conv2DLayer<A> {
+    pub fn ds_x(&self) -> Jacobean {
+        let mut ds_x = Jacobean::zeros((self.output.len(), self.input.len()));
+        let li = self.input.shape();
+        let lo = self.output.shape();
+        let lf = self.filter.shape();
+        for i in 0..lo[0] {
+            for j in 0..lo[1] {
+                for k in 0..lo[2] {
+                    for x in 0..lf[0] {
+                        for y in 0..lf[1] {
+                            for z in 0..lf[2] {
+                                ds_x[(
+                                    lo[2] * (lo[1] * i + j) + k,
+                                    lf[2] * (li[1] * (x + i) + y + j) + z,
+                                )] = self.filter[[x, y, z, k]];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ds_x
+    }
+
     pub fn convolution(input: &Array3<f32>, filter: &Array4<f32>, output: &mut Array3<f32>) {
         for i in 0..output.shape()[0] {
             for j in 0..output.shape()[1] {
@@ -139,37 +159,6 @@ impl<A: Activation> Conv2DLayer<A> {
             }
         }
     }
-
-    pub fn full_convolution_rot(
-        input: &Array3<f32>,
-        filter: &Array4<f32>,
-        output: &mut Array3<f32>,
-    ) {
-        for i in 0..output.shape()[0] {
-            for j in 0..output.shape()[1] {
-                for k in 0..output.shape()[2] {
-                    let mut sum = 0.0;
-                    for x in 0..filter.shape()[0] {
-                        for y in 0..filter.shape()[1] {
-                            for z in 0..filter.shape()[2] {
-                                let xi = i as i32 - x as i32;
-                                let yj = j as i32 - y as i32;
-                                if xi >= 0
-                                    && yj >= 0
-                                    && xi < input.shape()[0] as i32
-                                    && yj < input.shape()[1] as i32
-                                {
-                                    sum +=
-                                        input[[xi as usize, yj as usize, z]] * filter[[x, y, z, k]];
-                                }
-                            }
-                        }
-                    }
-                    output[[i, j, k]] = sum;
-                }
-            }
-        }
-    }
 }
 
 pub struct MaxPooling2D {
@@ -182,20 +171,20 @@ impl MaxPooling2D {
     }
 }
 
-impl Template<MaxPooling2DLayer> for MaxPooling2D {
-    fn into(self, before: Vec<usize>) -> MaxPooling2DLayer {
+impl LayerBuilder for MaxPooling2D {
+    fn build(self, before: Vec<usize>) -> Box<dyn Layer> {
         let after = vec![
             before[0] / self.pool_size.0,
             before[1] / self.pool_size.1,
             before[2],
         ];
-        MaxPooling2DLayer {
+        Box::new(MaxPooling2DLayer {
             pool_size: self.pool_size,
             input: Array3::<f32>::zeros((before[0], before[1], before[2])),
             output: Array3::<f32>::zeros((after[0], after[1], after[2])),
             before,
             after,
-        }
+        })
     }
 }
 
@@ -217,10 +206,8 @@ impl Layer for MaxPooling2DLayer {
         self.after.clone()
     }
 
-    fn forward(&mut self, input: Vec<f32>) -> Vec<f32> {
-        self.input =
-            Array3::from_shape_vec((self.before[0], self.before[1], self.before[2]), input)
-                .unwrap();
+    fn forward(&mut self, input: Column) -> Column {
+        self.input = input.to_arr((self.before[0], self.before[1], self.before[2]));
         for i in 0..self.after[0] {
             for j in 0..self.after[1] {
                 for k in 0..self.after[2] {
@@ -236,12 +223,11 @@ impl Layer for MaxPooling2DLayer {
                 }
             }
         }
-        self.output.clone().into_raw_vec()
+        Column::from_arr(self.output.clone())
     }
 
-    fn backward(&mut self, dele: Vec<f32>, lr: f32) -> Vec<f32> {
-        let dele =
-            Array3::from_shape_vec((self.after[0], self.after[1], self.after[2]), dele).unwrap();
+    fn backward(&mut self, dc_y: Column, _: f32) -> Column {
+        let dc_y = dc_y.to_arr((self.after[0], self.after[1], self.after[2]));
         for i in 0..self.before[0] {
             for j in 0..self.before[1] {
                 for k in 0..self.before[2] {
@@ -249,11 +235,11 @@ impl Layer for MaxPooling2DLayer {
                         == self.output[[i / self.pool_size.0, j / self.pool_size.1, k]]
                     {
                         self.input[[i, j, k]] =
-                            dele[[i / self.pool_size.0, j / self.pool_size.1, k]];
+                            dc_y[[i / self.pool_size.0, j / self.pool_size.1, k]];
                     }
                 }
             }
         }
-        self.input.clone().into_raw_vec()
+        Column::from_arr(self.input.clone())
     }
 }

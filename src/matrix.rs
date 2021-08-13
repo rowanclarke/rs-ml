@@ -1,10 +1,9 @@
 use ndarray::{ArrayBase, Dimension, OwnedRepr, StrideShape};
 use rand::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
 pub struct Matrix {
     matrix: Vec<f32>,
     shape: (usize, usize),
@@ -124,7 +123,7 @@ impl fmt::Display for Matrix {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
 pub struct Column {
     column: Vec<f32>,
 }
