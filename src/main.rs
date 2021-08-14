@@ -1,10 +1,12 @@
 mod activation;
+mod array;
 mod layer;
 mod loss;
 mod matrix;
 mod model;
 
 use activation::{relu::ReLU, sigmoid::Sigmoid, softmax::Softmax};
+use array::{Array, Array2, Array4, Shape};
 use layer::{
     conv2d::{Conv2D, MaxPooling2D},
     feed::Feed,
@@ -14,35 +16,28 @@ use loss::xent::CrossEntropy;
 use matrix::Column;
 use mnist::{Mnist, MnistBuilder};
 use model::ModelBuilder;
-use ndarray::{s, Array, Array2, Array4, Axis, Dimension, RemoveAxis};
 
-fn slice<'a, D: RemoveAxis>(dat: Array<f32, D>, size: usize) -> Box<[Column]> {
-    let mut _dat = Vec::<Column>::with_capacity(size);
-
-    for i in 0..size {
-        let slice = dat.index_axis(Axis(0), i).to_owned();
-        _dat.push(Column::from_arr(slice));
-    }
-
-    _dat.into_boxed_slice()
+fn slice<'a, T: Shape>(dat: Array<T>, size: usize) -> Box<[Column]> {
+    let iter = dat.axis();
+    let dat: Vec<Column> = iter.map(|x| Column::new(x.to_vec())).collect();
+    dat.into_boxed_slice()
 }
 
 fn lbl<'a>(lbl: Vec<u8>, size: usize) -> Box<[Column]> {
-    let lbl = Array2::<u8>::from_shape_vec((size, 10), lbl)
-        .unwrap()
-        .map(|&x| x as f32);
+    let lbl = Array2::from_shape_vec([size, 10], lbl.into_iter().map(|x| x as f32).collect());
     slice(lbl, size)
 }
 
 fn img<'a>(img: Vec<u8>, size: usize) -> Box<[Column]> {
-    let img = Array4::<u8>::from_shape_vec((size, 28, 28, 1), img)
-        .unwrap()
-        .map(|&x| x as f32 / 255.0);
+    let img = Array4::from_shape_vec(
+        [size, 28, 28, 1],
+        img.into_iter().map(|x| x as f32 / 255.0).collect(),
+    );
     slice(img, size)
 }
 
 fn main() {
-    let trn_size: usize = 1000;
+    let trn_size: usize = 1;
     let tst_size: usize = 20;
 
     let Mnist {
@@ -74,9 +69,8 @@ fn main() {
     let tst_img = img(tst_img, tst_size);
     let tst_lbl = lbl(tst_lbl, tst_size);
 
-    model.train(trn_img, trn_lbl, 10);
-    model.test(tst_img);
-    for i in 0..tst_lbl.len() {
-        println!("{}", tst_lbl[i]);
-    }
+    model.train(trn_img, trn_lbl, 3);
+
+    let model = bincode::serialize(&model).unwrap();
+    println!("{:?}", model);
 }

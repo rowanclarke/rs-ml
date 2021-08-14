@@ -1,5 +1,6 @@
 use super::super::matrix::Column;
 use super::{Layer, LayerBuilder};
+use serde::{Deserialize, Serialize};
 
 pub struct Flatten {}
 
@@ -41,6 +42,7 @@ impl LayerBuilder for Reshape {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ReshapeLayer {
     before: Vec<usize>,
     after: Vec<usize>,

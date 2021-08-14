@@ -1,9 +1,10 @@
-use ndarray::{ArrayBase, Dimension, OwnedRepr, StrideShape};
+use super::array::{Array, Shape};
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops;
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Matrix {
     matrix: Vec<f32>,
     shape: (usize, usize),
@@ -123,7 +124,7 @@ impl fmt::Display for Matrix {
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Column {
     column: Vec<f32>,
 }
@@ -167,14 +168,12 @@ impl Column {
         }
     }
 
-    pub fn to_arr<D: Dimension, Sh: Into<StrideShape<D>>>(
-        self,
-        shape: Sh,
-    ) -> ArrayBase<OwnedRepr<f32>, D> {
-        ArrayBase::<OwnedRepr<f32>, D>::from_shape_vec(shape, self.column).unwrap()
+    pub fn to_arr<T: Shape>(self, shape: T) -> Array<T> {
+        //ArrayBase::<OwnedRepr<f32>, D>::from_shape_vec(shape, self.column).unwrap()
+        Array::<T>::from_shape_vec(shape, self.column)
     }
 
-    pub fn from_arr<D: Dimension>(array: ArrayBase<OwnedRepr<f32>, D>) -> Column {
+    pub fn from_arr<T: Shape>(array: Array<T>) -> Column {
         Column::new(array.into_raw_vec())
     }
 }

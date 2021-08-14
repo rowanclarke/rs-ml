@@ -1,9 +1,9 @@
+use super::super::array::{Array3, Array4};
 use super::super::{
     activation::Activation,
     matrix::{Column, Jacobean},
 };
 use super::{Layer, LayerBuilder};
-use ndarray::{Array3, Array4};
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -33,16 +33,15 @@ impl<A: Activation> LayerBuilder for Conv2D<A> {
             self.filters,
         ];
         Box::new(Conv2DLayer::<A> {
-            filter: Array4::<f32>::zeros((
+            filter: Array4::random([
                 self.kernel_size.0,
                 self.kernel_size.1,
                 before[2],
                 self.filters,
-            ))
-            .map(|_| rng.gen::<f32>()),
-            input: Array3::<f32>::zeros((before[0], before[1], before[2])),
-            sum: Array3::<f32>::zeros((after[0], after[1], after[2])),
-            output: Array3::<f32>::zeros((after[0], after[1], after[2])),
+            ]),
+            input: Array3::zeros([before[0], before[1], before[2]]),
+            sum: Array3::zeros([after[0], after[1], after[2]]),
+            output: Array3::zeros([after[0], after[1], after[2]]),
             before,
             after,
             phantom: PhantomData,
@@ -52,10 +51,10 @@ impl<A: Activation> LayerBuilder for Conv2D<A> {
 
 #[derive(Serialize, Deserialize)]
 pub struct Conv2DLayer<A: Activation> {
-    filter: Array4<f32>,
-    input: Array3<f32>,
-    sum: Array3<f32>,
-    output: Array3<f32>,
+    filter: Array4,
+    input: Array3,
+    sum: Array3,
+    output: Array3,
     before: Vec<usize>,
     after: Vec<usize>,
     phantom: PhantomData<A>,
@@ -71,30 +70,28 @@ impl<A: Activation> Layer for Conv2DLayer<A> {
     }
 
     fn forward(&mut self, input: Column) -> Column {
-        self.input = input
-            .clone()
-            .to_arr((self.before[0], self.before[1], self.before[2]));
+        self.input = input.to_arr([self.before[0], self.before[1], self.before[2]]);
         Self::convolution(&self.input, &self.filter, &mut self.sum);
         let sum = Column::from_arr(self.sum.clone());
         //asserteq!(sum, (&self.ds_x() * &input));
         let output = A::activate(sum);
         self.output = output
             .clone()
-            .to_arr((self.after[0], self.after[1], self.after[2]));
+            .to_arr([self.after[0], self.after[1], self.after[2]]);
         output
     }
 
     fn backward(&mut self, dc_y: Column, lr: f32) -> Column {
         let sum = Column::from_arr(self.sum.clone());
-        let mut dc_f = Array4::<f32>::zeros(self.filter.raw_dim());
+        let mut dc_f = Array4::zeros(self.filter.shape());
         let dy_s = A::deactivate(sum);
         let mut ds_x = self.ds_x();
         ds_x.transpose();
         let dc_s = &dy_s * &dc_y;
         let dc_x = &ds_x * &dc_s;
-        let dc_s = dc_s.to_arr((self.after[0], self.after[1], self.after[2]));
+        let dc_s = dc_s.to_arr([self.after[0], self.after[1], self.after[2]]);
         Self::back_convolution(&self.input, &dc_s, &mut dc_f);
-        self.filter = &self.filter - &(lr * dc_f);
+        self.filter = &self.filter - &(&dc_f * lr);
         dc_x
     }
 }
@@ -124,7 +121,7 @@ impl<A: Activation> Conv2DLayer<A> {
         ds_x
     }
 
-    pub fn convolution(input: &Array3<f32>, filter: &Array4<f32>, output: &mut Array3<f32>) {
+    pub fn convolution(input: &Array3, filter: &Array4, output: &mut Array3) {
         for i in 0..output.shape()[0] {
             for j in 0..output.shape()[1] {
                 for k in 0..output.shape()[2] {
@@ -142,7 +139,7 @@ impl<A: Activation> Conv2DLayer<A> {
         }
     }
 
-    pub fn back_convolution(input: &Array3<f32>, output: &Array3<f32>, filter: &mut Array4<f32>) {
+    pub fn back_convolution(input: &Array3, output: &Array3, filter: &mut Array4) {
         for i in 0..filter.shape()[0] {
             for j in 0..filter.shape()[1] {
                 for k in 0..filter.shape()[2] {
@@ -180,8 +177,8 @@ impl LayerBuilder for MaxPooling2D {
         ];
         Box::new(MaxPooling2DLayer {
             pool_size: self.pool_size,
-            input: Array3::<f32>::zeros((before[0], before[1], before[2])),
-            output: Array3::<f32>::zeros((after[0], after[1], after[2])),
+            input: Array3::zeros([before[0], before[1], before[2]]),
+            output: Array3::zeros([after[0], after[1], after[2]]),
             before,
             after,
         })
@@ -191,8 +188,8 @@ impl LayerBuilder for MaxPooling2D {
 #[derive(Serialize, Deserialize)]
 pub struct MaxPooling2DLayer {
     pool_size: (usize, usize),
-    input: Array3<f32>,
-    output: Array3<f32>,
+    input: Array3,
+    output: Array3,
     before: Vec<usize>,
     after: Vec<usize>,
 }
@@ -207,7 +204,7 @@ impl Layer for MaxPooling2DLayer {
     }
 
     fn forward(&mut self, input: Column) -> Column {
-        self.input = input.to_arr((self.before[0], self.before[1], self.before[2]));
+        self.input = input.to_arr([self.before[0], self.before[1], self.before[2]]);
         for i in 0..self.after[0] {
             for j in 0..self.after[1] {
                 for k in 0..self.after[2] {
@@ -227,7 +224,7 @@ impl Layer for MaxPooling2DLayer {
     }
 
     fn backward(&mut self, dc_y: Column, _: f32) -> Column {
-        let dc_y = dc_y.to_arr((self.after[0], self.after[1], self.after[2]));
+        let dc_y = dc_y.to_arr([self.after[0], self.after[1], self.after[2]]);
         for i in 0..self.before[0] {
             for j in 0..self.before[1] {
                 for k in 0..self.before[2] {

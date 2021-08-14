@@ -3,6 +3,7 @@ use super::super::{
     matrix::{Column, Matrix},
 };
 use super::{Layer, LayerBuilder};
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 pub struct Feed<A: Activation> {
@@ -34,6 +35,7 @@ impl<A: Activation> LayerBuilder for Feed<A> {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct FeedLayer<A: Activation> {
     pub weights: Matrix,
     pub bias: Column,
