@@ -1,53 +1,25 @@
 use super::super::{
-    activation::Activation,
+    activation::{Activation, ActivationBuilder},
     matrix::{Column, Matrix},
 };
 use super::{Layer, LayerBuilder};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
-pub struct Feed<A: Activation> {
-    after: usize,
-    phantom: PhantomData<A>,
-}
-
-impl<A: Activation> Feed<A> {
-    pub fn new(after: usize) -> Self {
-        Self {
-            after,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<A: Activation> LayerBuilder for Feed<A> {
-    fn build(self, before: Vec<usize>) -> Box<dyn Layer> {
-        Box::new(FeedLayer::<A> {
-            weights: Matrix::random((self.after, before[0])),
-            bias: Column::random(self.after),
-            input: Column::zeros(before[0]),
-            sum: Column::zeros(self.after),
-            output: Column::zeros(self.after),
-            before: before[0],
-            after: self.after,
-            phantom: PhantomData,
-        })
-    }
-}
-
 #[derive(Serialize, Deserialize)]
-pub struct FeedLayer<A: Activation> {
-    pub weights: Matrix,
-    pub bias: Column,
+pub struct FeedLayer {
+    activation: Box<dyn Activation>,
+    weights: Matrix,
+    bias: Column,
     input: Column,
     sum: Column,
     output: Column,
     before: usize,
     after: usize,
-    phantom: PhantomData<A>,
 }
 
-impl<A: Activation> Layer for FeedLayer<A> {
+#[typetag::serde]
+impl Layer for FeedLayer {
     fn before(&self) -> Vec<usize> {
         vec![self.before]
     }
@@ -59,12 +31,12 @@ impl<A: Activation> Layer for FeedLayer<A> {
     fn forward(&mut self, input: Column) -> Column {
         self.input = input;
         self.sum = &(&self.weights * &self.input) + &self.bias;
-        self.output = A::activate(self.sum.clone());
+        self.output = self.activation.activate(self.sum.clone());
         self.output.clone()
     }
 
     fn backward(&mut self, dc_y: Column, lr: f32) -> Column {
-        let dy_s = A::deactivate(self.sum.clone());
+        let dy_s = self.activation.deactivate(self.sum.clone());
         let dc_s = &dy_s * &dc_y;
         let mut ds_w = Matrix::zeros((self.after * self.before, self.after));
         for i in 0..self.after {
@@ -84,5 +56,34 @@ impl<A: Activation> Layer for FeedLayer<A> {
         self.weights -= &lr_dc_w;
         self.bias -= &(&(&ds_b * &dc_s) * lr);
         &ds_x * &dc_s
+    }
+}
+
+pub struct Feed<A: Activation> {
+    activation: A,
+    after: usize,
+}
+
+impl<A: Activation + ActivationBuilder> Feed<A> {
+    pub fn new(after: usize) -> Self {
+        Self {
+            activation: A::new(),
+            after,
+        }
+    }
+}
+
+impl<A: Activation> LayerBuilder for Feed<A> {
+    fn build(self, before: Vec<usize>) -> Box<dyn Layer> {
+        Box::new(FeedLayer {
+            activation: Box::new(self.activation),
+            weights: Matrix::random((self.after, before[0])),
+            bias: Column::random(self.after),
+            input: Column::zeros(before[0]),
+            sum: Column::zeros(self.after),
+            output: Column::zeros(self.after),
+            before: before[0],
+            after: self.after,
+        })
     }
 }

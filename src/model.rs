@@ -1,7 +1,7 @@
 use super::layer::{Layer, LayerBuilder};
 use super::loss::Loss;
 use super::matrix::Column;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 pub struct ModelBuilder {
@@ -32,7 +32,7 @@ impl ModelBuilder {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Model<L: Loss> {
     lr: f32,
     layers: Vec<Box<dyn Layer>>,
