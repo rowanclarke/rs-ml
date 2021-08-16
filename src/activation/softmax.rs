@@ -1,10 +1,13 @@
 use super::super::matrix::{Column, Jacobean};
-use super::Activation;
+use super::{Activation, ActivationBuilder};
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct Softmax {}
 
+#[typetag::serde]
 impl Activation for Softmax {
-    fn activate(mut vec: Column) -> Column {
+    fn activate(&self, mut vec: Column) -> Column {
         let mut sum = 0.0;
         let mut max = f32::MIN;
         for i in 0..vec.len() {
@@ -20,9 +23,9 @@ impl Activation for Softmax {
         vec
     }
 
-    fn deactivate(vec: Column) -> Jacobean {
+    fn deactivate(&self, vec: Column) -> Jacobean {
         let mut del = Jacobean::zeros((vec.len(), vec.len()));
-        let vec = Self::activate(vec);
+        let vec = self.activate(vec);
         for i in 0..vec.len() {
             for j in 0..vec.len() {
                 if i == j {
@@ -33,5 +36,11 @@ impl Activation for Softmax {
             }
         }
         del
+    }
+}
+
+impl ActivationBuilder for Softmax {
+    fn new() -> Self {
+        Softmax {}
     }
 }

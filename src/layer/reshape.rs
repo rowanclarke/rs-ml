@@ -1,5 +1,31 @@
 use super::super::matrix::Column;
 use super::{Layer, LayerBuilder};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct ReshapeLayer {
+    before: Vec<usize>,
+    after: Vec<usize>,
+}
+
+#[typetag::serde]
+impl Layer for ReshapeLayer {
+    fn before(&self) -> Vec<usize> {
+        self.before.clone()
+    }
+
+    fn after(&self) -> Vec<usize> {
+        self.after.clone()
+    }
+
+    fn forward(&mut self, input: Column) -> Column {
+        input
+    }
+
+    fn backward(&mut self, target: Column, _: f32) -> Column {
+        target
+    }
+}
 
 pub struct Flatten {}
 
@@ -38,28 +64,5 @@ impl LayerBuilder for Reshape {
             before,
             after: self.shape,
         })
-    }
-}
-
-pub struct ReshapeLayer {
-    before: Vec<usize>,
-    after: Vec<usize>,
-}
-
-impl Layer for ReshapeLayer {
-    fn before(&self) -> Vec<usize> {
-        self.before.clone()
-    }
-
-    fn after(&self) -> Vec<usize> {
-        self.after.clone()
-    }
-
-    fn forward(&mut self, input: Column) -> Column {
-        input
-    }
-
-    fn backward(&mut self, target: Column, _: f32) -> Column {
-        target
     }
 }

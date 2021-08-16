@@ -5,6 +5,7 @@ pub mod reshape;
 use super::matrix::Column;
 use std::any::Any;
 
+#[typetag::serde(tag = "layer")]
 pub trait Layer: Any {
     fn before(&self) -> Vec<usize>;
     fn after(&self) -> Vec<usize>;

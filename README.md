@@ -1,2 +1,2 @@
 # rs-ml
- Machine Learning Library in Rust
+Machine Learning Library in Rust
