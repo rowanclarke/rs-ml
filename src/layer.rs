@@ -3,10 +3,9 @@ pub mod feed;
 pub mod reshape;
 
 use super::matrix::Column;
-use erased_serde::serialize_trait_object;
 use std::any::Any;
 
-#[typetag::serde(tag = "type")]
+#[typetag::serde(tag = "layer")]
 pub trait Layer: Any {
     fn before(&self) -> Vec<usize>;
     fn after(&self) -> Vec<usize>;
