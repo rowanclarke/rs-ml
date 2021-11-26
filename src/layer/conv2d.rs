@@ -30,10 +30,13 @@ impl Layer for Conv2DLayer {
     }
 
     fn forward(&mut self, input: Column) -> Column {
-        self.input = input.to_arr([self.before[0], self.before[1], self.before[2]]);
-        Self::convolution(&self.input, &self.filter, &mut self.sum);
-        let sum = Column::from_arr(self.sum.clone());
-        //asserteq!(sum, (&self.ds_x() * &input));
+        self.input = input
+            .clone()
+            .to_arr([self.before[0], self.before[1], self.before[2]]);
+        let sum = &self.ds_x() * &input;
+        self.sum = sum
+            .clone()
+            .to_arr([self.after[0], self.after[1], self.after[2]]);
         let output = self.activation.activate(sum);
         self.output = output
             .clone()
@@ -77,36 +80,31 @@ impl Layer for MaxPooling2DLayer {
 
     fn forward(&mut self, input: Column) -> Column {
         self.input = input.to_arr([self.before[0], self.before[1], self.before[2]]);
-        for i in 0..self.after[0] {
-            for j in 0..self.after[1] {
-                for k in 0..self.after[2] {
-                    let mut max: f32 = 0.0;
-                    for x in 0..self.pool_size.0 {
-                        for y in 0..self.pool_size.1 {
-                            max = max.max(
-                                self.input[[self.pool_size.0 * i + x, self.pool_size.1 * j + y, k]],
-                            )
-                        }
-                    }
-                    self.output[[i, j, k]] = max;
+        for i in self.output.iter() {
+            let mut max: f32 = 0.0;
+            for x in 0..self.pool_size.0 {
+                for y in 0..self.pool_size.1 {
+                    max = max.max(
+                        self.input[[
+                            self.pool_size.0 * i[0] + x,
+                            self.pool_size.1 * i[1] + y,
+                            i[2],
+                        ]],
+                    )
                 }
             }
+            self.output[i] = max;
         }
         Column::from_arr(self.output.clone())
     }
 
     fn backward(&mut self, dc_y: Column, _: f32) -> Column {
         let dc_y = dc_y.to_arr([self.after[0], self.after[1], self.after[2]]);
-        for i in 0..self.before[0] {
-            for j in 0..self.before[1] {
-                for k in 0..self.before[2] {
-                    if self.input[[i, j, k]]
-                        == self.output[[i / self.pool_size.0, j / self.pool_size.1, k]]
-                    {
-                        self.input[[i, j, k]] =
-                            dc_y[[i / self.pool_size.0, j / self.pool_size.1, k]];
-                    }
-                }
+        for i in self.input.iter() {
+            if self.input[i]
+                == self.output[[i[0] / self.pool_size.0, i[1] / self.pool_size.1, i[2]]]
+            {
+                self.input[i] = dc_y[[i[0] / self.pool_size.0, i[1] / self.pool_size.1, i[2]]];
             }
         }
         Column::from_arr(self.input.clone())
@@ -187,58 +185,24 @@ impl Conv2DLayer {
         let li = self.input.shape();
         let lo = self.output.shape();
         let lf = self.filter.shape();
-        for i in 0..lo[0] {
-            for j in 0..lo[1] {
-                for k in 0..lo[2] {
-                    for x in 0..lf[0] {
-                        for y in 0..lf[1] {
-                            for z in 0..lf[2] {
-                                ds_x[(
-                                    lo[2] * (lo[1] * i + j) + k,
-                                    lf[2] * (li[1] * (x + i) + y + j) + z,
-                                )] = self.filter[[x, y, z, k]];
-                            }
-                        }
-                    }
-                }
+        for i in self.output.iter_filter(|x| x[2] > 0) {
+            for j in self.filter.iter() {
+                ds_x[(
+                    lo[2] * (lo[1] * i[0] + i[1]) + j[3],
+                    lf[2] * (li[1] * (j[0] + i[0]) + j[1] + i[1]) + j[2],
+                )] = self.filter[j];
             }
         }
         ds_x
     }
 
-    pub fn convolution(input: &Array3, filter: &Array4, output: &mut Array3) {
-        for i in 0..output.shape()[0] {
-            for j in 0..output.shape()[1] {
-                for k in 0..output.shape()[2] {
-                    let mut sum = 0.0;
-                    for x in 0..filter.shape()[0] {
-                        for y in 0..filter.shape()[1] {
-                            for z in 0..filter.shape()[2] {
-                                sum += input[[i + x, j + y, z]] * filter[[x, y, z, k]];
-                            }
-                        }
-                    }
-                    output[[i, j, k]] = sum;
-                }
-            }
-        }
-    }
-
     pub fn back_convolution(input: &Array3, output: &Array3, filter: &mut Array4) {
-        for i in 0..filter.shape()[0] {
-            for j in 0..filter.shape()[1] {
-                for k in 0..filter.shape()[2] {
-                    for l in 0..filter.shape()[3] {
-                        let mut sum = 0.0;
-                        for x in 0..output.shape()[0] {
-                            for y in 0..output.shape()[1] {
-                                sum += input[[i + x, j + y, k]] * output[[x, y, l]];
-                            }
-                        }
-                        filter[[i, j, k, l]] = sum;
-                    }
-                }
+        for i in filter.iter() {
+            let mut sum = 0.0;
+            for j in output.iter_filter(|x| x[2] > 0) {
+                sum += input[[i[0] + j[0], i[1] + j[1], i[2]]] * output[[j[0], j[1], i[3]]];
             }
+            filter[i] = sum;
         }
     }
 }

@@ -9,30 +9,54 @@ pub type Array3 = Array<[usize; 3]>;
 pub type Array4 = Array<[usize; 4]>;
 pub type Array5 = Array<[usize; 5]>;
 
-pub trait Shape: ops::Index<usize, Output = usize> + IntoIterator<Item = usize> + Clone {}
-impl<T> Shape for T where T: ops::Index<usize, Output = usize> + IntoIterator<Item = usize> + Clone {}
+pub trait Shape:
+    ops::Index<usize, Output = usize> + ops::IndexMut<usize> + IntoIterator<Item = usize> + Clone
+{
+}
+
+impl<T> Shape for T where
+    T: ops::Index<usize, Output = usize>
+        + ops::IndexMut<usize>
+        + IntoIterator<Item = usize>
+        + Clone
+{
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Array<T: Shape> {
     array: Vec<f32>,
+    idx: Vec<T>,
     shape: T,
 }
 
 impl<T: Shape> Array<T> {
+    fn to_t(mut x: usize, shape: T) -> T {
+        let mut idx = shape.clone();
+        for i in (0..shape.clone().into_iter().count()).rev() {
+            idx[i] = x % shape[i];
+            x /= shape[i];
+        }
+        idx
+    }
+
     pub fn random(shape: T) -> Self {
         let mut rng = rand::thread_rng();
+        let len = shape.clone().into_iter().product();
         Self {
-            array: vec![0.0; shape.clone().into_iter().product()]
+            array: vec![0.0; len]
                 .into_iter()
                 .map(|_| rng.gen::<f32>())
                 .collect(),
+            idx: (0..len).map(|x| Self::to_t(x, shape.clone())).collect(),
             shape,
         }
     }
 
     pub fn zeros(shape: T) -> Self {
+        let len = shape.clone().into_iter().product();
         Self {
-            array: vec![0.0; shape.clone().into_iter().product()],
+            array: vec![0.0; len],
+            idx: (0..len).map(|x| Self::to_t(x, shape.clone())).collect(),
             shape,
         }
     }
@@ -42,7 +66,12 @@ impl<T: Shape> Array<T> {
     }
 
     pub fn from_shape_vec(shape: T, array: Vec<f32>) -> Array<T> {
-        Array::<T> { array, shape }
+        let len = shape.clone().into_iter().product();
+        Array::<T> {
+            array,
+            idx: (0..len).map(|x| Self::to_t(x, shape.clone())).collect(),
+            shape,
+        }
     }
 
     pub fn into_raw_vec(self) -> Vec<f32> {
@@ -57,6 +86,17 @@ impl<T: Shape> Array<T> {
         let mut iter_shape = self.shape.clone().into_iter();
         iter_shape.next();
         self.array.chunks(iter_shape.product())
+    }
+
+    pub fn iter(&self) -> std::vec::IntoIter<T> {
+        self.idx.clone().into_iter()
+    }
+
+    pub fn iter_filter<F: FnMut(&T) -> bool>(
+        &self,
+        f: F,
+    ) -> std::iter::Filter<std::vec::IntoIter<T>, F> {
+        self.idx.clone().into_iter().filter(f).into_iter()
     }
 }
 

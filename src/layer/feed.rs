@@ -1,6 +1,6 @@
 use super::super::{
     activation::{Activation, ActivationBuilder},
-    matrix::{Column, Matrix},
+    matrix::{Column, Jacobean, Matrix},
 };
 use super::{Layer, LayerBuilder};
 use serde::{Deserialize, Serialize};
@@ -38,23 +38,13 @@ impl Layer for FeedLayer {
     fn backward(&mut self, dc_y: Column, lr: f32) -> Column {
         let dy_s = self.activation.deactivate(self.sum.clone());
         let dc_s = &dy_s * &dc_y;
-        let mut ds_w = Matrix::zeros((self.after * self.before, self.after));
-        for i in 0..self.after {
-            for j in 0..self.before {
-                ds_w[(i * self.before + j, i)] = self.input[j];
-            }
-        }
-        let mut ds_b = Matrix::zeros((self.after, self.after));
-        for i in 0..self.after {
-            ds_b[(i, i)] = 1.0;
-        }
         let mut ds_x = self.weights.clone();
         ds_x.transpose();
-        let dc_w = &ds_w * &dc_s;
+        let dc_w = &self.ds_w() * &dc_s;
         let mut lr_dc_w = (&dc_w * lr).to_mat();
         lr_dc_w.reshape(self.weights.shape());
         self.weights -= &lr_dc_w;
-        self.bias -= &(&(&ds_b * &dc_s) * lr);
+        self.bias -= &(&(&self.ds_b() * &dc_s) * lr);
         &ds_x * &dc_s
     }
 }
@@ -85,5 +75,25 @@ impl<A: Activation> LayerBuilder for Feed<A> {
             before: before[0],
             after: self.after,
         })
+    }
+}
+
+impl FeedLayer {
+    pub fn ds_b(&self) -> Jacobean {
+        let mut ds_b = Matrix::zeros((self.after, self.after));
+        for i in 0..self.after {
+            ds_b[(i, i)] = 1.0;
+        }
+        ds_b
+    }
+
+    pub fn ds_w(&self) -> Jacobean {
+        let mut ds_w = Matrix::zeros((self.after * self.before, self.after));
+        for i in 0..self.after {
+            for j in 0..self.before {
+                ds_w[(i * self.before + j, i)] = self.input[j];
+            }
+        }
+        ds_w
     }
 }

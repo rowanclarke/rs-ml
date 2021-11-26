@@ -230,7 +230,7 @@ impl PartialEq for Column {
     }
 }
 
-impl fmt::Display for Column {
+impl fmt::Debug for Column {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.column)
     }

@@ -12,3 +12,11 @@ rand = "0.8.4"
 serde = { version = "1.0.127", features = ["derive"] }
 bincode = "1.3.3"
 typetag = "0.1.7"
+
+[dev-dependencies]
+criterion = "0.3"
+
+
+[[bench]]
+name = "layer"
+harness = false

@@ -53,7 +53,7 @@ impl<'a> Model<'a> {
         for e in 0..epochs {
             for i in 0..inputs.len() {
                 let cost = self.train_one(inputs[i].clone(), targets[i].clone());
-                println!("{}: cost: {}", e, cost);
+                //println!("{}: cost: {}", e, cost);
             }
         }
     }
@@ -70,7 +70,7 @@ impl<'a> Model<'a> {
         println!("TESTING");
         for i in 0..inputs.len() {
             let y = self.test_one(inputs[i].clone());
-            println!("{}", y);
+            println!("{:?}", y);
         }
     }
 
